@@ -1,16 +1,12 @@
-import * as React from "react";
-import FreeEbookCarousel from "./FreeEbookCarousel";
-import GenresEbook from "./GenresEbook";
-import EditorsChoiceEbooks from "./EditorsChoiceEbooks";
+import React from "react";
+import FilterSection from "./FilterSection";
+import ServiceProviders from "./ServiceProviders";
 
-const HomePage = () => {
+export const HomePage = () => {
   return (
-    <>
-      <FreeEbookCarousel />
-      <GenresEbook />
-      <EditorsChoiceEbooks />
-    </>
+    <div>
+      <FilterSection />
+      <ServiceProviders />
+    </div>
   );
 };
-
-export default HomePage;

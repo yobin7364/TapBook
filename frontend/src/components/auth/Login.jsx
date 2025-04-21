@@ -17,8 +17,9 @@ import {
 import { useForm, Controller } from "react-hook-form";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { loginUser } from "../../action/authAction"; // your login thunk
 // import { setError } from "../../slice/authSlice"; // optional: clear or set errors
+import { setCurrentUser } from "../../redux/authSlice";
+import { loginUser } from "../../action/authAction";
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -40,10 +41,18 @@ const Login = () => {
   const onSubmit = async (data) => {
     try {
       // Attempt to login and unwrap the result (this will throw an error if rejected)
-      await dispatch(loginUser(data)).unwrap();
+      const decoded = await dispatch(loginUser(data)).unwrap();
+
+      // set current user
+      dispatch(setCurrentUser(decoded));
 
       // Navigate to dashboard if login is successful
-      //navigate("/dashboard");
+
+      if (data.role == "user") {
+        navigate("/");
+      } else {
+        navigate("/dashboardPage");
+      }
     } catch (err) {
       // Handle known validation errors from API (i.e., errors returned from your API)
       if (err) {
@@ -57,6 +66,13 @@ const Login = () => {
           setFieldError("password", {
             type: "manual",
             message: err.password,
+          });
+        }
+
+        if (err.role) {
+          setFieldError("role", {
+            type: "manual",
+            message: err.role,
           });
         }
       } else {
@@ -74,6 +90,7 @@ const Login = () => {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
+          minHeight: "76vh",
         }}
       >
         <Paper
@@ -103,6 +120,7 @@ const Login = () => {
               variant="outlined"
               margin="normal"
               type="email"
+              sx={{ backgroundColor: "#ffffff" }}
               {...register("email", {
                 required: "Email is required",
                 pattern: {
@@ -120,6 +138,7 @@ const Login = () => {
               variant="outlined"
               margin="normal"
               type="password"
+              sx={{ backgroundColor: "#ffffff" }}
               {...register("password", {
                 required: "Password is required",
               })}

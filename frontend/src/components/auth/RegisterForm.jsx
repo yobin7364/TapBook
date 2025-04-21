@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm, Controller } from "react-hook-form";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import { registerUser } from "../../action/authAction";
 import { useNavigate } from "react-router-dom";
+import CommonToast from "../common/CommonToast";
 
 const Register = () => {
   const dispatch = useDispatch();
@@ -37,24 +38,37 @@ const Register = () => {
     setError,
   } = useForm({
     defaultValues: {
-      role: "user", // Set "user" as the default role
+      role: "user",
     },
   });
 
-  // Show error snackbar when there's an error in registration
-  const [openSnackbar, setOpenSnackbar] = React.useState(false);
+  // For snack bar Start
 
-  useEffect(() => {
-    if (error) {
-      setOpenSnackbar(true); // Open snackbar if there’s an error
-    }
-  }, [error]);
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setOpenSnackbar(true);
+  };
+
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
+  };
+
+  // For snack Bar end
 
   const onSubmit = async (data) => {
     try {
       await dispatch(registerUser(data)).unwrap(); // use unwrap if using createAsyncThunk
 
-      navigate("/login"); // for example
+      showSnackbar("Registration successful!", "success"); // 👈 show Toast first
+
+      setTimeout(() => {
+        navigate("/login");
+      }, 1500);
     } catch (err) {
       // Handle known validation errors from API
 
@@ -84,11 +98,6 @@ const Register = () => {
     }
   };
 
-  // Close the error snackbar
-  const handleCloseSnackbar = () => {
-    setOpenSnackbar(false);
-  };
-
   return (
     <Container maxWidth="xs">
       <Box
@@ -97,6 +106,8 @@ const Register = () => {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
+          minHeight: "76vh",
+          pb: 2,
         }}
       >
         <Paper
@@ -124,6 +135,7 @@ const Register = () => {
               label="Name"
               variant="outlined"
               margin="normal"
+              sx={{ backgroundColor: "#ffffff" }}
               {...register("name", { required: "Name is required" })}
               error={!!errors.name}
               helperText={errors.name?.message}
@@ -134,6 +146,7 @@ const Register = () => {
               variant="outlined"
               margin="normal"
               type="email"
+              sx={{ backgroundColor: "#ffffff" }}
               {...register("email", {
                 required: "Email is required",
                 pattern: {
@@ -150,6 +163,7 @@ const Register = () => {
               variant="outlined"
               margin="normal"
               type="password"
+              sx={{ backgroundColor: "#ffffff" }}
               {...register("password", {
                 required: "Password is required",
                 minLength: {
@@ -166,6 +180,7 @@ const Register = () => {
               variant="outlined"
               margin="normal"
               type="password"
+              sx={{ backgroundColor: "#ffffff" }}
               {...register("password2", {
                 required: "Confirm Password is required",
                 validate: (value) =>
@@ -175,7 +190,7 @@ const Register = () => {
               helperText={errors.password2?.message}
             />
 
-            {/* Role selection for User or admin */}
+            {/* Role selection for user or admin */}
             <FormLabel sx={{ mt: 2 }}>Role</FormLabel>
             <Controller
               name="role"
@@ -217,29 +232,21 @@ const Register = () => {
             </Button>
           </Box>
 
-          {/* Error Snackbar */}
-          <Snackbar
-            open={openSnackbar}
-            autoHideDuration={6000}
-            onClose={handleCloseSnackbar}
-          >
-            <Alert onClose={handleCloseSnackbar} severity="error">
-              {error?.message || "An error occurred during registration."}
-            </Alert>
-          </Snackbar>
-
           <Typography variant="body2" align="center" sx={{ marginTop: 2 }}>
             Already have an account?{" "}
-            <Link
-              href="#"
-              onClick={() => navigate("/login")}
-              sx={{ cursor: "pointer" }}
-            >
+            <Link onClick={() => navigate("/login")} sx={{ cursor: "pointer" }}>
               Log in
             </Link>
           </Typography>
         </Paper>
       </Box>
+
+      <CommonToast
+        open={openSnackbar}
+        message={snackbarMessage}
+        severity={snackbarSeverity}
+        onClose={handleCloseSnackbar}
+      />
     </Container>
   );
 };

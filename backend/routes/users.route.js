@@ -99,6 +99,14 @@ router.post("/login", (req, res) => {
       // Check password
       bcrypt.compare(password, user.password).then((isMatch) => {
         if (isMatch) {
+          if (!user.role.includes(selectedRole)) {
+            errors.role = `User does not have role: ${selectedRole}`;
+            return res.status(400).json({
+              success: false,
+              errors,
+            });
+          }
+
           // User matched
           const payload = { id: user.id, name: user.name, role: user.role }; // JWT payload
 
