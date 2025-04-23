@@ -1,8 +1,8 @@
+// BookingPage.jsx
 import React, { useState, useEffect } from "react";
-import { Box, Typography, Button, Grid } from "@mui/material";
+import { Box, Typography, Button, Grid, TextField } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
-// Generate next 7 days
 const getNext7Days = () => {
   const today = new Date();
   const days = [];
@@ -14,11 +14,9 @@ const getNext7Days = () => {
   return days;
 };
 
-// Generate time slots (every 30 minutes)
 const generateTimeSlots = () => {
   const slots = [];
   for (let hour = 9; hour <= 20; hour++) {
-    // 9AM - 8PM
     slots.push(`${hour}:00`);
     slots.push(`${hour}:30`);
   }
@@ -29,6 +27,8 @@ const BookingPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState("");
   const [availableSlots, setAvailableSlots] = useState([]);
+  const [mobile, setMobile] = useState("");
+  const [note, setNote] = useState("");
   const navigator = useNavigate();
 
   const dates = getNext7Days();
@@ -47,29 +47,22 @@ const BookingPage = () => {
     setSelectedTime("");
   }, [selectedDate]);
 
-  const handleDateSelect = (date) => {
-    setSelectedDate(date);
-  };
-
-  const handleTimeSelect = (time) => {
-    setSelectedTime(time);
-  };
-
   const handleContinue = () => {
-    if (!selectedTime) {
-      console.log("No time selected!");
+    if (!selectedTime || !/^\d{10}$/.test(mobile)) {
+      console.log("Time or mobile not valid");
       return;
     }
 
-    // Combine selected Date + selected Time into one ISO string
     const [hour, minute] = selectedTime.split(":");
-    const bookingDateTime = new Date(selectedDate); // Clone date object
+    const bookingDateTime = new Date(selectedDate);
     bookingDateTime.setHours(Number(hour));
     bookingDateTime.setMinutes(Number(minute));
     bookingDateTime.setSeconds(0);
     bookingDateTime.setMilliseconds(0);
 
     console.log("Booking ISO Time:", bookingDateTime.toISOString());
+    console.log("Mobile:", mobile);
+    console.log("Note:", note);
     navigator("/appointmentSummary");
   };
 
@@ -94,7 +87,6 @@ const BookingPage = () => {
           boxShadow: 3,
         }}
       >
-        {/* Heading */}
         <Typography variant="h5" fontWeight="bold" gutterBottom>
           Book Appointment
         </Typography>
@@ -112,15 +104,13 @@ const BookingPage = () => {
             123 Health Street, Wellness City
           </Typography>
         </Box>
-
         <Box sx={{ height: "1px", backgroundColor: "#ccc", mt: 2 }} />
 
-        {/* Dates */}
         <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
           {dates.map((date, idx) => (
             <Button
               key={idx}
-              onClick={() => handleDateSelect(date)}
+              onClick={() => setSelectedDate(date)}
               variant={
                 selectedDate.toDateString() === date.toDateString()
                   ? "contained"
@@ -143,7 +133,6 @@ const BookingPage = () => {
 
         <Box sx={{ height: "1px", backgroundColor: "#ccc", mt: 2 }} />
 
-        {/* Time Slots */}
         <Grid container spacing={2} mt={4}>
           {availableSlots.length > 0 ? (
             availableSlots.map((time, idx) => (
@@ -151,7 +140,7 @@ const BookingPage = () => {
                 <Button
                   fullWidth
                   variant={selectedTime === time ? "contained" : "outlined"}
-                  onClick={() => handleTimeSelect(time)}
+                  onClick={() => setSelectedTime(time)}
                 >
                   {time}
                 </Button>
@@ -162,13 +151,40 @@ const BookingPage = () => {
           )}
         </Grid>
 
-        {/* Continue Button */}
+        <Grid container spacing={2} mt={4}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Mobile Number"
+              fullWidth
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              error={mobile !== "" && !/^\d{10}$/.test(mobile)}
+              helperText={
+                mobile !== "" && !/^\d{10}$/.test(mobile)
+                  ? "Enter a valid 10-digit mobile number"
+                  : ""
+              }
+              sx={{ maxWidth: "300px" }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Special Note (Optional)"
+              fullWidth
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              multiline
+              minRows={4}
+            />
+          </Grid>
+        </Grid>
+
         <Box sx={{ p: 2, display: "flex", justifyContent: "center" }}>
           <Button
             variant="contained"
             sx={{ px: 4 }}
             onClick={handleContinue}
-            disabled={!selectedTime}
+            disabled={!selectedTime || !/^\d{10}$/.test(mobile)}
           >
             Continue
           </Button>

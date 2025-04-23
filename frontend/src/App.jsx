@@ -14,6 +14,11 @@ import Membership from "./components/pages/user/Membership/Membership";
 import Notifications from "./components/pages/user/Notification/Notifications";
 import ProfilePage from "./components/pages/user/profile/ProfilePage";
 import ChangePasswordPage from "./components/pages/user/profile/ChangePasswordPage";
+import AdminNavBar from "./components/common/AdminNavBar";
+import Dashboard from "./components/pages/admin/Dashboard/Dashboard";
+import AppointmentTabs from "./components/pages/admin/Appointment/Appointment";
+import ServiceSettingsPage from "./components/pages/admin/Service/ServiceSettingsPage";
+import CustomerReviewsPage from "./components/pages/admin/Reviews/CustomerReviewsPage";
 
 import { useSelector } from "react-redux";
 import setAuthToken from "./utils/setAuthToken";
@@ -47,7 +52,8 @@ function App() {
   return (
     <Provider store={store}>
       <Router>
-        <UserNavbar />
+        {currentRole == "admin" ? <AdminNavBar /> : <UserNavbar />}
+
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<Login />} />
@@ -55,14 +61,28 @@ function App() {
           <Route path="/bookingPage" element={<BookingPage />} />
           <Route path="/appointmentSummary" element={<AppointmentSummary />} />
 
-          <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
-            <Route path="/myAppointments" element={<MyAppointments />} />
-            <Route path="/updateAppointment" element={<UpdateAppointment />} />
-            <Route path="/myMembership" element={<Membership />} />
-            <Route path="/notifications" element={<Notifications />} />
-            <Route path="/profilePage" element={<ProfilePage />} />
-            <Route path="/changePassword" element={<ChangePasswordPage />} />
-          </Route>
+          {currentRole == "admin" ? (
+            <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
+              <Route path="/dashboardPage" element={<Dashboard />} />
+              <Route path="/manageAppointment" element={<AppointmentTabs />} />
+              <Route path="/serviceSetting" element={<ServiceSettingsPage />} />
+              <Route path="/profilePage" element={<ProfilePage />} />
+              <Route path="/changePassword" element={<ChangePasswordPage />} />
+              <Route path="/ratingPage" element={<CustomerReviewsPage />} />
+            </Route>
+          ) : (
+            <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
+              <Route path="/myAppointments" element={<MyAppointments />} />
+              <Route
+                path="/updateAppointment"
+                element={<UpdateAppointment />}
+              />
+              <Route path="/myMembership" element={<Membership />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/profilePage" element={<ProfilePage />} />
+              <Route path="/changePassword" element={<ChangePasswordPage />} />
+            </Route>
+          )}
         </Routes>
         <UserFooter />
       </Router>

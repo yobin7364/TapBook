@@ -1,12 +1,16 @@
 import React from "react";
 import { Box, Typography } from "@mui/material";
+import { useSelector } from "react-redux";
 
 const UserFooter = () => {
+  const currentRole = useSelector((state) => state.auth.user?.role[0]);
+
   return (
     <Box
       sx={{
         width: "100%",
-        bgcolor: "primary.main", // Same background color as AppBar
+        bgcolor: currentRole == "admin" ? "#443850" : "primary.main",
+
         color: "white",
         py: 2, // padding y-axis (top and bottom)
         mt: "auto", // Push footer to bottom if needed
