@@ -21,6 +21,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { logout } from "../../redux/authSlice";
+import EventBusyIcon from "@mui/icons-material/EventBusy";
 
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import AssessmentIcon from "@mui/icons-material/Assessment";
@@ -56,7 +57,12 @@ export const AdminDrawer = () => {
     {
       text: "Generate Report",
       icon: <AssessmentIcon />,
-      toGo: "/generateReport",
+      toGo: "/reportPage",
+    },
+    {
+      text: "Cancel Appointments",
+      icon: <EventBusyIcon />,
+      toGo: "/cancelAppointments",
     },
     { text: "Profile", icon: <AccountCircleIcon />, toGo: "/profilePage" },
     { text: "Logout", icon: <LogoutIcon />, toGo: "/logout" }, // Mark logout specially

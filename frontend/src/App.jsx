@@ -19,12 +19,14 @@ import Dashboard from "./components/pages/admin/Dashboard/Dashboard";
 import AppointmentTabs from "./components/pages/admin/Appointment/Appointment";
 import ServiceSettingsPage from "./components/pages/admin/Service/ServiceSettingsPage";
 import CustomerReviewsPage from "./components/pages/admin/Reviews/CustomerReviewsPage";
+import CancelAppointments from "./components/pages/admin/CancelAppointments/CancelAppointments";
 
 import { useSelector } from "react-redux";
 import setAuthToken from "./utils/setAuthToken";
 import { jwtDecode } from "jwt-decode";
 import { setCurrentUser, logout } from "./redux/authSlice";
 import PrivateRoute from "./components/common/PrivateRoute";
+import ReportPage from "./components/pages/admin/ReportPage/ReportPage";
 
 function App() {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
@@ -69,6 +71,11 @@ function App() {
               <Route path="/profilePage" element={<ProfilePage />} />
               <Route path="/changePassword" element={<ChangePasswordPage />} />
               <Route path="/ratingPage" element={<CustomerReviewsPage />} />
+              <Route path="/reportPage" element={<ReportPage />} />
+              <Route
+                path="/cancelAppointments"
+                element={<CancelAppointments />}
+              />
             </Route>
           ) : (
             <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>

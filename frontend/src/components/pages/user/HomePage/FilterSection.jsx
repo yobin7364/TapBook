@@ -9,11 +9,12 @@ import {
   TextField,
   InputAdornment,
   Rating,
+  Slider,
 } from "@mui/material";
 
 import SearchIcon from "@mui/icons-material/Search";
 
-// Enums (or you can move to enums.js)
+// Enums
 const CategoriesEnum = [
   "Haircut",
   "Massage",
@@ -21,12 +22,6 @@ const CategoriesEnum = [
   "Dentist",
   "Gym",
   "Consultation",
-];
-
-const TimeSlotsEnum = [
-  { label: "Morning (8AM-12PM)", startTime: "08:00", endTime: "12:00" },
-  { label: "Afternoon (12PM-4PM)", startTime: "12:00", endTime: "16:00" },
-  { label: "Evening (4PM-8PM)", startTime: "16:00", endTime: "20:00" },
 ];
 
 const FilterSection = () => {
@@ -41,7 +36,7 @@ const FilterSection = () => {
   const [anchorElRating, setAnchorElRating] = useState(null);
 
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState([8, 18]); // Default 8AM-6PM
   const [selectedRating, setSelectedRating] = useState(0);
 
   const handleCategoryClick = (event) =>
@@ -61,28 +56,33 @@ const FilterSection = () => {
     }
   };
 
-  const handleTimeSlotChange = (slot) => {
-    setSelectedTimeSlot(slot);
-    handleTimeClose();
-  };
-
   const handleRatingChange = (event, newValue) => {
     setSelectedRating(newValue);
     handleRatingClose();
   };
 
+  const formatHourLabel = (value) => {
+    const hour = value % 24;
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const formattedHour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${formattedHour}${suffix}`;
+  };
+
   const handleApplyFilters = () => {
+    const startHour = selectedTimeSlot[0];
+    const endHour = selectedTimeSlot[1];
+
+    const formatTime = (hour) => {
+      const suffix = hour >= 12 ? "PM" : "AM";
+      const formattedHour = hour % 12 === 0 ? 12 : hour % 12;
+      return `${formattedHour}${suffix}`;
+    };
+
     console.log("Filters applied: ", {
       search: searchTerm,
       date: selectedDate,
       categories: selectedCategories,
-      timeSlot: selectedTimeSlot
-        ? {
-            label: selectedTimeSlot.label,
-            start: selectedTimeSlot.startTime,
-            end: selectedTimeSlot.endTime,
-          }
-        : "Any",
+      timeSlot: `${formatTime(startHour)} - ${formatTime(endHour)}`,
       rating: selectedRating,
     });
   };
@@ -90,7 +90,7 @@ const FilterSection = () => {
   const handleResetFilters = () => {
     setSearchTerm("");
     setSelectedCategories([]);
-    setSelectedTimeSlot(null);
+    setSelectedTimeSlot([8, 18]);
     setSelectedRating(0);
     setSelectedDate(new Date().toISOString().split("T")[0]);
   };
@@ -240,24 +240,43 @@ const FilterSection = () => {
                 },
               }}
             >
-              Time Slot {selectedTimeSlot ? `(Selected)` : ""}
+              Time Slot ({formatHourLabel(selectedTimeSlot[0])} -{" "}
+              {formatHourLabel(selectedTimeSlot[1])})
             </Button>
             <Menu
               anchorEl={anchorElTime}
               open={Boolean(anchorElTime)}
               onClose={handleTimeClose}
+              MenuListProps={{
+                disablePadding: true,
+              }}
+              PaperProps={{
+                sx: { padding: 2, width: 300 },
+              }}
             >
-              <MenuItem onClick={() => handleTimeSlotChange(null)}>
-                Any
-              </MenuItem>
-              {TimeSlotsEnum.map((slot) => (
-                <MenuItem
-                  key={slot.label}
-                  onClick={() => handleTimeSlotChange(slot)}
-                >
-                  {slot.label}
-                </MenuItem>
-              ))}
+              <Box sx={{ width: "100%" }}>
+                <div style={{ fontSize: "14px", marginBottom: "12px" }}>
+                  Select Time Range
+                </div>
+                <Box sx={{ px: 2 }}>
+                  <Slider
+                    value={selectedTimeSlot}
+                    min={0}
+                    max={24}
+                    step={1}
+                    onChange={(e, newValue) => setSelectedTimeSlot(newValue)}
+                    valueLabelDisplay="on"
+                    valueLabelFormat={formatHourLabel}
+                    marks={[
+                      { value: 0, label: "12AM" },
+                      { value: 6, label: "6AM" },
+                      { value: 12, label: "12PM" },
+                      { value: 18, label: "6PM" },
+                      { value: 24, label: "12AM" },
+                    ]}
+                  />
+                </Box>
+              </Box>
             </Menu>
           </div>
 
