@@ -1,5 +1,5 @@
-import mongoose from "mongoose";
-const { Schema } = mongoose;
+import mongoose from 'mongoose'
+const { Schema } = mongoose
 
 // Create schema
 const UserSchema = new Schema(
@@ -16,15 +16,23 @@ const UserSchema = new Schema(
       type: String,
       required: true,
     },
-    role: { type: [String], enum: ["user", "admin"], required: true }, // Only two roles
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    resetPasswordToken: {type: String},
+    resetTokenExpiry: {type: Date},
+    availableTimeSlots: [
+      {
+        start: { type: Date, required: true },
+        end: { type: Date, required: true },
+      },
+    ],
   },
   {
     timestamps: true, // createdAt, updatedAt
   }
-);
+)
 
 // "users" is a collection (like a table in SQL)
-const User = mongoose.model("users", UserSchema);
+const User = mongoose.model('User', UserSchema)
 
 // Exporting the model
-export default User;
+export default User
