@@ -12,7 +12,7 @@ import adminTimeSlotsRoutes from './routes/adminTimeSlots.route.js'
 import adminServicesRoutes from './routes/adminServices.route.js'
 import appointmentRoutes from './routes/appointments.route.js'
 import reviewRoutes from './routes/reviews.route.js'
-
+import adminReviewsRoutes from './routes/adminReviews.route.js'
 
 dotenv.config()
 
@@ -34,7 +34,7 @@ app.use('/api/users', users)
 app.use('/api/appointments', appointmentRoutes)
 app.use(errorHandler)
 app.use('/api/reviews', reviewRoutes)
-
+app.use('/api/admin/reviews', adminReviewsRoutes)
 const mongoURI = keys.mongoURI
 
 //connect to mongoDB

@@ -74,3 +74,161 @@ export const getReviewsForUser = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
+// @route   PUT /api/reviews/:id
+// @desc    Edit a review (customer only)
+// @access  Private (user)
+export const updateReview = async (req, res) => {
+  const { errors, isValid } = validateReview(req.body)
+  if (!isValid) {
+    return res.status(400).json({ success: false, errors })
+  }
+
+  try {
+    // Only allow the original reviewer to edit
+    const review = await Review.findOne({
+      _id: req.params.id,
+      reviewer: req.user.id
+    })
+    if (!review) {
+      return res
+        .status(404)
+        .json({ success: false, error: 'Review not found or not yours to edit' })
+    }
+
+    // Update fields
+    review.rating  = req.body.rating
+    review.comment = req.body.comment
+    await review.save()
+
+    return res.json({ success: true, review })
+  } catch (err) {
+    console.error('Update review error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
+
+
+// @route   POST /api/admin/reviews
+// @desc    Submit a review of a customer (admin only)
+// @access  Private (admin)
+export const createCustomerReview = async (req, res) => {
+  const { errors, isValid } = validateReview(req.body)
+  if (!isValid) {
+    return res.status(400).json({ success: false, errors })
+  }
+
+  const { appointment, rating, comment } = req.body
+  try {
+    // 1) Find the appointment
+    const appt = await Appointment.findById(appointment)
+    if (!appt) {
+      return res.status(404).json({ success: false, error: 'Appointment not found' })
+    }
+
+    // 2) Ensure this admin created the service
+    const svc = await Service.findById(appt.service)
+    if (!svc || svc.admin.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Not authorized to review this customer' })
+    }
+
+    // 3) Only completed/cancelled appointments
+    if (!['confirmed','cancelled'].includes(appt.status)) {
+      return res.status(400).json({ success: false, error: 'Can only review completed or cancelled appointments' })
+    }
+
+    // 4) Prevent duplicate
+    if (await Review.findOne({ appointment })) {
+      return res.status(400).json({ success: false, error: 'Review already exists for this appointment' })
+    }
+
+    // 5) Create and save
+    const review = new Review({
+      appointment,
+      reviewer: req.user.id,    // admin
+      reviewee:  appt.customer, // customer
+      service:   appt.service,
+      rating,
+      comment
+    })
+    await review.save()
+    return res.status(201).json({ success: true, review })
+
+  } catch (err) {
+    console.error('Create customer review error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
+// @route   GET /api/admin/reviews
+// @desc    List customer-reviews written by this admin
+// @access  Private (admin)
+export const listCustomerReviews = async (req, res) => {
+  try {
+    const reviews = await Review.find({ reviewer: req.user.id })
+      .populate('reviewee','name email')   // show customer info
+      .populate('appointment','service slot') // optional
+    return res.json({ success: true, reviews })
+  } catch (err) {
+    console.error('List customer reviews error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
+
+// @route   PUT /api/admin/reviews/:id
+// @desc    Edit a customer-review (admin only)
+// @access  Private (admin)
+export const updateCustomerReview = async (req, res) => {
+  const { errors, isValid } = validateReview(req.body)
+  if (!isValid) {
+    return res.status(400).json({ success: false, errors })
+  }
+
+  try {
+    // Only allow the admin who wrote it
+    const review = await Review.findOne({
+      _id: req.params.id,
+      reviewer: req.user.id
+    })
+    if (!review) {
+      return res
+        .status(404)
+        .json({ success: false, error: 'Review not found or not yours to edit' })
+    }
+
+    // Update fields
+    review.rating  = req.body.rating
+    review.comment = req.body.comment
+    await review.save()
+
+    return res.json({ success: true, review })
+  } catch (err) {
+    console.error('Update customer review error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
+
+// @route   DELETE /api/admin/reviews/:id
+// @desc    Delete a customer review (admin only)
+// @access  Private (admin)
+export const deleteCustomerReview = async (req, res) => {
+  const { id } = req.params
+
+  try {
+    // Only allow the admin who wrote it to delete it
+    const review = await Review.findOneAndDelete({
+      _id: id,
+      reviewer: req.user.id
+    })
+
+    if (!review) {
+      return res
+        .status(404)
+        .json({ success: false, error: 'Review not found or not yours to delete' })
+    }
+
+    return res.json({ success: true, message: 'Review deleted' })
+  } catch (err) {
+    console.error('Delete customer review error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}

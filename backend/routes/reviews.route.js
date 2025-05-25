@@ -4,6 +4,7 @@ import { authorizeRoles } from '../middleware/roleCheck.js'
 import {
   createReview,
   getReviewsForUser,
+  updateReview
 } from '../controllers/reviewController.js'
 
 const router = express.Router()
@@ -20,5 +21,8 @@ router.post('/', authorizeRoles('user'), createReview)
 // @desc    View reviews about a user
 // @access  Public
 router.get('/user/:id', getReviewsForUser)
-
+// @route   PUT /api/reviews/:id
+// @desc    Edit your own review
+// @access  Private (user)
+router.put('/:id', authorizeRoles('user'), updateReview)
 export default router

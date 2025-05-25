@@ -1,5 +1,8 @@
 import Service from '../models/Service.module.js'
 import { validateService } from '../validator/service.validator.js'
+import Review from '../models/Review.module.js'
+import Appointment from '../models/Appointment.module.js'
+import { validateReview } from '../validator/review.validator.js'
 
 // @route   POST /api/admin/services
 // @desc    Create a new service (admin only)
@@ -22,19 +25,53 @@ export const createService = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
-
 // @route   GET /api/admin/services
-// @desc    List all services (admin view)
-// @access  Private
+// @desc    List all services with rating info (admin view)
+// @access  Private (admin)
 export const listServices = async (req, res) => {
   try {
-    const services = await Service.find().populate('admin', 'name email') // ← populate admin
-    return res.json({ success: true, services })
+    // 1) Fetch raw services
+    const services = await Service.find()
+      .populate('admin', 'name email')
+
+    // 2) For each service, compute avgRating + reviewCount
+    const results = await Promise.all(
+      services.map(async (svc) => {
+        const stats = await Review.aggregate([
+          { $match: { reviewee: svc.admin._id } },
+          {
+            $group: {
+              _id: '$reviewee',
+              avgRating:   { $avg: '$rating' },
+              reviewCount: { $sum: 1 }
+            }
+          }
+        ])
+
+        // stats[0] may be undefined if no reviews
+        const { avgRating = 0, reviewCount = 0 } = stats[0] || {}
+
+        return {
+          id:          svc._id,
+          title:       svc.title,
+          description: svc.description,
+          category:    svc.category,
+          price:       svc.price,
+          duration:    svc.duration,
+          admin:       svc.admin,
+          avgRating,
+          reviewCount
+        }
+      })
+    )
+
+    return res.json({ success: true, services: results })
   } catch (err) {
     console.error('List services error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
 
 // @route   PUT /api/admin/services/:id
 // @desc    Update a service (admin only)
@@ -83,3 +120,63 @@ export const deleteService = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
+// @route   POST /api/admin/reviews
+// @desc    Submit a review of a customer (admin only)
+// @access  Private (admin)
+export const createCustomerReview = async (req, res) => {
+  const { errors, isValid } = validateReview(req.body)
+  if (!isValid) {
+    return res.status(400).json({ success: false, errors })
+  }
+
+  const { appointment, rating, comment } = req.body
+  try {
+    // 1) Verify appointment exists
+    const appt = await Appointment.findById(appointment)
+    if (!appt) {
+      return res
+        .status(404)
+        .json({ success: false, error: 'Appointment not found' })
+    }
+
+    // 2) Only the admin who owns the service can review
+    const svc = await Service.findById(appt.service)
+    if (!svc || svc.admin.toString() !== req.user.id) {
+      return res
+        .status(403)
+        .json({ success: false, error: 'Not authorized to review this customer' })
+    }
+
+    // 3) Only completed or cancelled appointments can be reviewed
+    if (!['confirmed','cancelled'].includes(appt.status)) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Can only review completed or cancelled appointments' })
+    }
+
+    // 4) Prevent duplicate review for same appointment
+    if (await Review.findOne({ appointment })) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Review already exists for this appointment' })
+    }
+
+    // 5) Create the review, reviewer=req.user.id, reviewee=customer
+    const review = new Review({
+      appointment,
+      reviewer: req.user.id,         // admin
+      reviewee:  appt.customer,      // customer
+      service:   appt.service,
+      rating,
+      comment
+    })
+    await review.save()
+    return res.status(201).json({ success: true, review })
+
+  } catch (err) {
+    console.error('Create customer review error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
+
