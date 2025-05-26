@@ -4,6 +4,127 @@ import Review from '../models/Review.module.js'
 import Appointment from '../models/Appointment.module.js'
 import { validateReview } from '../validator/review.validator.js'
 
+export const publicListServices = async (req, res) => {
+  try {
+    // 1) Parse filters
+    const {
+      q, // keyword search
+      category,
+      minPrice,
+      maxPrice,
+      minRating,
+      start, // ISO date for slot start
+      end, // ISO date for slot end
+    } = req.query
+
+    // 2) Build a Mongoose match object for services
+    const serviceMatch = {}
+    if (q) serviceMatch.title = { $regex: q, $options: 'i' }
+    if (category) serviceMatch.category = category
+    if (minPrice)
+      serviceMatch.price = { ...serviceMatch.price, $gte: +minPrice }
+    if (maxPrice)
+      serviceMatch.price = { ...serviceMatch.price, $lte: +maxPrice }
+
+    // 3) Start aggregation
+    const pipeline = [
+      { $match: serviceMatch },
+      // bring in admin info
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'admin',
+          foreignField: '_id',
+          as: 'admin',
+        },
+      },
+      { $unwind: '$admin' },
+      // compute review stats
+      {
+        $lookup: {
+          from: 'reviews',
+          let: { svcId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$service', '$$svcId'] } } },
+            {
+              $group: {
+                _id: null,
+                avgRating: { $avg: '$rating' },
+                reviewCount: { $sum: 1 },
+              },
+            },
+          ],
+          as: 'stats',
+        },
+      },
+      {
+        $addFields: {
+          avgRating: {
+            $ifNull: [{ $arrayElemAt: ['$stats.avgRating', 0] }, 0],
+          },
+          reviewCount: {
+            $ifNull: [{ $arrayElemAt: ['$stats.reviewCount', 0] }, 0],
+          },
+        },
+      },
+      // filter by rating if requested
+      ...(minRating ? [{ $match: { avgRating: { $gte: +minRating } } }] : []),
+    ]
+
+    // 4) If time-slot filters provided, only keep services whose admin has availability
+    if (start && end) {
+      const startDate = new Date(start)
+      const endDate = new Date(end)
+      pipeline.push(
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'admin._id',
+            foreignField: '_id',
+            as: 'adminDoc',
+          },
+        },
+        { $unwind: '$adminDoc' },
+        {
+          $match: {
+            'adminDoc.availableTimeSlots': {
+              $elemMatch: {
+                start: { $lt: endDate }, // slot begins before your end
+                end: { $gt: startDate }, // slot ends after your start
+              },
+            },
+          },
+        }
+      )
+    }
+
+    // 5) Project only necessary fields
+    pipeline.push({
+      $project: {
+        id: '$_id',
+        title: 1,
+        description: 1,
+        category: 1,
+        price: 1,
+        duration: 1,
+        admin: {
+          id: '$admin._id',
+          name: '$admin.name',
+          email: '$admin.email',
+        },
+        avgRating: 1,
+        reviewCount: 1,
+      },
+    })
+
+    // 6) Execute and return
+    const services = await Service.aggregate(pipeline)
+    return res.json({ success: true, services })
+  } catch (err) {
+    console.error('Public list services error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
 // @route   POST /api/admin/services
 // @desc    Create a new service (admin only)
 // @access  Private

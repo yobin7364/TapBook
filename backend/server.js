@@ -13,6 +13,9 @@ import adminServicesRoutes from './routes/adminServices.route.js'
 import appointmentRoutes from './routes/appointments.route.js'
 import reviewRoutes from './routes/reviews.route.js'
 import adminReviewsRoutes from './routes/adminReviews.route.js'
+import adminDashboardRoutes from './routes/adminDashboard.route.js'
+import servicesRoutes from './routes/services.route.js'
+import adminAppointmentRoutes from './routes/adminAppointments.route.js'
 
 dotenv.config()
 
@@ -28,6 +31,7 @@ app.use(bodyParser.json())
 // Initialize Passport middleware
 app.use(passport.initialize())
 // Mount all your routers
+app.use('/api/services', servicesRoutes)
 app.use('/api/admin/time-slots', adminTimeSlotsRoutes)
 app.use('/api/admin/services', adminServicesRoutes)
 app.use('/api/users', users)
@@ -35,6 +39,10 @@ app.use('/api/appointments', appointmentRoutes)
 app.use(errorHandler)
 app.use('/api/reviews', reviewRoutes)
 app.use('/api/admin/reviews', adminReviewsRoutes)
+app.use('/api/admin/dashboard', adminDashboardRoutes)
+app.use('/api/admin/appointments', adminAppointmentRoutes)
+
+import './utils/notificationScheduler.js'
 const mongoURI = keys.mongoURI
 
 //connect to mongoDB

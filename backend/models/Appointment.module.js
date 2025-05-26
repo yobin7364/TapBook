@@ -17,6 +17,9 @@ const AppointmentSchema = new Schema(
       start: { type: Date, required: true },
       end: { type: Date, required: true },
     },
+    scheduledAt: { type: Date},
+    reminded: {type: Boolean, default: false},
+    
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'declined', 'cancelled'],
