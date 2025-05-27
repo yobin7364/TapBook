@@ -28,72 +28,61 @@ import { setCurrentUser, logout } from "./redux/authSlice";
 import PrivateRoute from "./components/common/PrivateRoute";
 import ReportPage from "./components/pages/admin/ReportPage/ReportPage";
 
+if (localStorage.authToken) {
+  setAuthToken(localStorage.authToken);
+  const decoded = jwtDecode(localStorage.authToken);
+  store.dispatch(setCurrentUser(decoded));
+
+  const currentTime = Date.now() / 1000;
+  if (decoded.exp < currentTime) {
+    store.dispatch(logout());
+    window.location.href = "/login";
+  }
+}
+
 function App() {
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-  const currentRole = useSelector((state) => state.auth.user?.role[0]);
-
-  // Check for token to maintain auth state
-  if (localStorage.authToken) {
-    // Set auth header
-    setAuthToken(localStorage.authToken);
-
-    // Decode token to get user data
-    const decoded = jwtDecode(localStorage.authToken);
-
-    // Set current user in Redux
-    store.dispatch(setCurrentUser(decoded));
-
-    // Check if token is expired
-    const currentTime = Date.now() / 1000;
-    if (decoded.exp < currentTime) {
-      store.dispatch(logout());
-      window.location.href = "/login";
-    }
-  }
+  const currentRole = useSelector((state) => state.auth.user?.role);
 
   return (
-    <Provider store={store}>
-      <Router>
-        {currentRole == "admin" ? <AdminNavBar /> : <UserNavbar />}
+    <Router>
+      {currentRole == "admin" && <AdminNavBar />}
+      {currentRole !== "admin" && <UserNavbar />}
 
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/registerForm" element={<RegisterForm />} />
-          <Route path="/bookingPage" element={<BookingPage />} />
-          <Route path="/appointmentSummary" element={<AppointmentSummary />} />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/registerForm" element={<RegisterForm />} />
+        <Route path="/bookingPage" element={<BookingPage />} />
+        <Route path="/appointmentSummary" element={<AppointmentSummary />} />
 
-          {currentRole == "admin" ? (
-            <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
-              <Route path="/dashboardPage" element={<Dashboard />} />
-              <Route path="/manageAppointment" element={<AppointmentTabs />} />
-              <Route path="/serviceSetting" element={<ServiceSettingsPage />} />
-              <Route path="/profilePage" element={<ProfilePage />} />
-              <Route path="/changePassword" element={<ChangePasswordPage />} />
-              <Route path="/ratingPage" element={<CustomerReviewsPage />} />
-              <Route path="/reportPage" element={<ReportPage />} />
-              <Route
-                path="/cancelAppointments"
-                element={<CancelAppointments />}
-              />
-            </Route>
-          ) : (
-            <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
-              <Route path="/myAppointments" element={<MyAppointments />} />
-              <Route
-                path="/updateAppointment"
-                element={<UpdateAppointment />}
-              />
-              <Route path="/myMembership" element={<Membership />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/profilePage" element={<ProfilePage />} />
-              <Route path="/changePassword" element={<ChangePasswordPage />} />
-            </Route>
-          )}
-        </Routes>
-        <UserFooter />
-      </Router>
-    </Provider>
+        {currentRole == "admin" ? (
+          <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
+            <Route path="/dashboardPage" element={<Dashboard />} />
+            <Route path="/manageAppointment" element={<AppointmentTabs />} />
+            <Route path="/serviceSetting" element={<ServiceSettingsPage />} />
+            <Route path="/profilePage" element={<ProfilePage />} />
+            <Route path="/changePassword" element={<ChangePasswordPage />} />
+            <Route path="/ratingPage" element={<CustomerReviewsPage />} />
+            <Route path="/reportPage" element={<ReportPage />} />
+            <Route
+              path="/cancelAppointments"
+              element={<CancelAppointments />}
+            />
+          </Route>
+        ) : (
+          <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
+            <Route path="/myAppointments" element={<MyAppointments />} />
+            <Route path="/updateAppointment" element={<UpdateAppointment />} />
+            <Route path="/myMembership" element={<Membership />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/profilePage" element={<ProfilePage />} />
+            <Route path="/changePassword" element={<ChangePasswordPage />} />
+          </Route>
+        )}
+      </Routes>
+      <UserFooter />
+    </Router>
   );
 }
 
