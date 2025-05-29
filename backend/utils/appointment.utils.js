@@ -2,86 +2,59 @@
 
 import Service from '../models/Service.module.js'
 import User from '../models/User.module.js'
-import { DateTime } from 'luxon'
 
 export async function getAppointmentSummaryData({ userId, serviceId, slot }) {
-  // 1) Load the service
+  // 1) Load service
   const svc = await Service.findById(serviceId)
-  if (!svc) {
-    return { error: 'Service not found' }
+  if (!svc) return { error: 'Service not found' }
+
+  // 2) Parse start/end as UTC
+  const start = new Date(slot.start)
+  const end = new Date(slot.end)
+  if (isNaN(start) || isNaN(end)) {
+    return { error: 'Invalid slot times' }
   }
 
-  // 2) Parse start/end into Luxon DateTimes
-  const toDateTime = (v) =>
-    v instanceof Date
-      ? DateTime.fromJSDate(v, { zone: 'utc' })
-      : DateTime.fromISO(v, { zone: 'utc' })
-
-  const startDT = toDateTime(slot.start)
-  const endDT = toDateTime(slot.end)
-
-  // 3) Convert to Australia/Sydney
-  const start = startDT.setZone('Australia/Sydney')
-  const end = endDT.setZone('Australia/Sydney')
-
-  // 4) Determine weekday name
-  const daysOfWeek = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-  ]
-  // Luxon.weekday: 1=Monday … 7=Sunday
-  const dayName = daysOfWeek[start.weekday % 7]
-
-  // 5) Access the hours correctly
-  let hours
-  if (typeof svc.businessHours.get === 'function') {
-    // Mongoose Map
-    hours = svc.businessHours.get(dayName)
-  } else {
-    // Plain object
-    hours = svc.businessHours[dayName]
-  }
+  // 3) Determine weekday name in UTC (or assume businessHours keys are in UTC weekdays)
+  const dayName = start.toLocaleDateString('en-US', {
+    weekday: 'long',
+    timeZone: 'UTC',
+  })
+  const hours = svc.businessHours.get
+    ? svc.businessHours.get(dayName) // Map
+    : svc.businessHours[dayName] // Object
 
   if (!hours || hours.closed) {
-    return { error: 'Requested day is outside provider business hours' }
+    return { error: 'Requested day is outside business hours' }
   }
 
-  // 6) Check time‐of‐day within open/close
-  const fmt = (dt) => dt.toFormat('HH:mm')
-  const startHM = fmt(start)
-  const endHM = fmt(end)
+  // 4) Check time‐of‐day against hours.from/to (both "HH:mm:ss")
+  const toHM = (d) => d.toISOString().slice(11, 16) // "HH:mm"
+  const startHM = toHM(start)
+  const endHM = toHM(end)
   const openHM = hours.from.slice(0, 5)
   const closeHM = hours.to.slice(0, 5)
-
   if (startHM < openHM || endHM > closeHM) {
-    return { error: 'Requested time is outside provider business hours' }
+    return { error: 'Requested time is outside business hours' }
   }
 
-  // 7) Compute membership discount
+  // 5) Compute discount
   const user = await User.findById(userId).lean()
   const now = new Date()
   let membershipDiscount = 0
-
   if (
     user.membership &&
     !user.membership.cancelled &&
     user.membership.expiryDate &&
     new Date(user.membership.expiryDate) > now
   ) {
-    const RATES = { monthly: 0.05, yearly: 0.1 }
-    const rate = RATES[user.membership.plan] || 0
+    const rate = user.membership.plan === 'yearly' ? 0.1 : 0.05
     membershipDiscount = svc.price * rate
   }
 
   const serviceCost = svc.price
   const totalDue = serviceCost - membershipDiscount
 
-  // 8) Return full data
   return {
     service: svc,
     summary: { serviceCost, membershipDiscount, totalDue },
