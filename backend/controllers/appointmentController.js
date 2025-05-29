@@ -127,6 +127,139 @@ export const bookAppointment = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+// @route   PUT /api/appointments/:id
+// @desc    Edit an existing appointment (user)
+// @access  Private (user)
+export const updateAppointment = async (req, res) => {
+  const { name, start, mobile, note } = req.body
+
+  // 0) Require at least one field to update
+  if (!name && !start && !mobile && !note) {
+    return res.status(400).json({
+      success: false,
+      error: 'Provide at least one of name, start, mobile, or note to update'
+    })
+  }
+
+  try {
+    // 1) Load appointment and ensure it's this user's
+    const appt = await Appointment.findById(req.params.id)
+    if (!appt || appt.customer.toString() !== req.user.id) {
+      return res.status(404).json({ success: false, error: 'Appointment not found' })
+    }
+
+    // 2) Only allow editing if still pending or confirmed
+    if (!['pending','confirmed'].includes(appt.status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot edit a cancelled, declined, or completed appointment'
+      })
+    }
+
+    let slot = appt.slot
+    let serviceCost = appt.payment.serviceCost
+    let membershipDiscount = appt.payment.membershipDiscount
+    let totalDue = appt.payment.totalDue
+
+    // 3) If start is changing, re‐validate slot & recalc payment
+    if (start) {
+      const startDate = new Date(start)
+      if (isNaN(startDate)) {
+        return res.status(400).json({ success: false, error: 'Invalid start date' })
+      }
+      const now = new Date()
+      if (startDate < now) {
+        return res.status(400).json({ success: false, error: 'Cannot reschedule into the past' })
+      }
+
+      // load service to get duration
+      const svc = await Service.findById(appt.service)
+      if (!svc) {
+        return res.status(404).json({ success: false, error: 'Service not found' })
+      }
+
+      const endDate = new Date(startDate.getTime() + svc.duration * 60000)
+      const newSlot = { start: startDate, end: endDate }
+
+      // business‐hours & cost summary
+      const { summary, error } = await getAppointmentSummaryData({
+        userId: req.user.id,
+        serviceId: svc._id.toString(),
+        slot: newSlot
+      })
+      if (error) {
+        return res.status(400).json({ success: false, error })
+      }
+
+      ({ serviceCost, membershipDiscount, totalDue } = summary)
+      slot = newSlot
+      appt.scheduledAt = startDate
+    }
+
+    // 4) Prevent double‐booking same provider
+    if (start) {
+      const conflict = await Appointment.findOne({
+        _id: { $ne: appt._id },
+        service: appt.service,
+        status: { $in: ['pending','confirmed'] },
+        'slot.start': { $lt: slot.end },
+        'slot.end':   { $gt: slot.start }
+      })
+      if (conflict) {
+        return res.status(400).json({ success: false, error: 'Time slot already booked' })
+      }
+      const selfConflict = await Appointment.findOne({
+        _id: { $ne: appt._id },
+        customer: req.user.id,
+        status: { $in: ['pending','confirmed'] },
+        'slot.start': { $lt: slot.end },
+        'slot.end':   { $gt: slot.start }
+      })
+      if (selfConflict) {
+        return res.status(400).json({ success: false, error: 'You already have a booking at this time' })
+      }
+    }
+
+    // 5) Apply other updates
+    if (name)   appt.customerName = name
+    if (mobile) appt.mobile       = mobile
+    if (note)   appt.note         = note
+    if (start)  appt.slot         = slot
+
+    // 6) Update payment if slot changed
+    if (start) {
+      appt.payment = { serviceCost, membershipDiscount, totalDue }
+    }
+
+    await appt.save()
+
+    // 7) Fetch updated avgRating, adminName, address for response
+    const svc = await Service.findById(appt.service)
+    const stats = await Review.aggregate([
+      { $match: { service: svc._id } },
+      { $group: { _id: null, avgRating: { $avg: '$rating' } } }
+    ])
+    const avgRating = stats[0]?.avgRating ?? 0
+    const adminUser = await User.findById(svc.admin).select('name').lean()
+    const adminName = adminUser?.name || 'Unknown'
+
+    // 8) Return updated appointment + related info
+    return res.json({
+      success:            true,
+      appointment:        appt,
+      serviceCost,
+      membershipDiscount,
+      totalDue,
+      serviceAddress:     svc.address,
+      avgRating,
+      adminName
+    })
+  } catch (err) {
+    console.error('Update appointment error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
+
 
 // @route   GET /api/appointments/upcoming
 // @desc    List all future (pending/confirmed) appointments for the user
@@ -139,7 +272,7 @@ export const getUpcomingAppointments = async (req, res) => {
       'slot.start': { $gte: now },
       status: { $in: ['pending','confirmed'] }
     })
-    .populate('service','title price duration address')
+    .populate('service','serviceName price duration address')
     .populate('customer','name email')
     .sort({ 'slot.start': 1 })
 
@@ -334,7 +467,7 @@ if (appt.status !== 'pending' && appt.status !== 'confirmed') {
          subject: `Your appointment was ${status}`,
          text: `Hi ${appt.customer.name},
 
-Your booking for "${appt.service.title}" was ${status} by the provider.
+Your booking for "${appt.service.serviceName}" was ${status} by the provider.
 
 Reason: ${cancelNote}
 
@@ -373,14 +506,14 @@ export const getNotifications = async (req, res) => {
       'slot.start': { $gte: now },
       status: { $in: ['pending', 'confirmed'] }
     })
-      .populate('service', 'title')
+      .populate('service', 'serviceName')
       .sort({ 'slot.start': 1 })
       .skip(skip)
       .limit(limit)
 
     // Format for frontend
     const notifications = appointments.map(appt => ({
-      title: appt.service?.title || 'Appointment',
+      serviceName: appt.service?.serviceName || 'Appointment',
       date: appt.slot.start,
       status: 'Upcoming',
       id: appt._id,

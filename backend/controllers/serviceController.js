@@ -5,7 +5,7 @@ import Appointment from '../models/Appointment.module.js'
 import { validateReview } from '../validator/review.validator.js'
 export const publicListServices = async (req, res) => {
   try {
-    const { q, category, minPrice, maxPrice, minRating, start, end } = req.query
+    const { serviceName, category, minPrice, maxPrice, minRating, start, end } = req.query
     const page = parseInt(req.query.page) > 0 ? parseInt(req.query.page) : 1
     const limit = parseInt(req.query.limit) > 0 ? parseInt(req.query.limit) : 6
     const skip = (page - 1) * limit
@@ -30,7 +30,7 @@ const latestAllowed = new Date(now.getTime() + maxAdvanceDays * 86400_000)
       }
     }
     const serviceMatch = {}
-    if (q) serviceMatch.title = { $regex: q, $options: 'i' }
+    if (serviceName) serviceMatch.serviceName = { $regex: serviceName, $options: 'i' }
     if (category) serviceMatch.category = category
     if (minPrice)
       serviceMatch.price = { ...serviceMatch.price, $gte: +minPrice }
@@ -107,6 +107,7 @@ const latestAllowed = new Date(now.getTime() + maxAdvanceDays * 86400_000)
     pipeline.push({
       $project: {
         id: '$_id',
+        serviceName,
         category: 1,
         price: 1,
         duration: 1,
@@ -170,8 +171,7 @@ export const createService = async (req, res) => {
   try {
     const service = new Service({
       admin: req.user.id,
-      title: req.body.title,
-      description: req.body.description,
+      serviceName: req.body.serviceName,
       category: req.body.category,
       price: req.body.price,
       duration: req.body.duration,
@@ -219,8 +219,8 @@ export const getServiceById = async (req, res) => {
     // reshape and return
     const payload = {
       id: service._id.toString(),
+      serviceName: service.serviceName,
       price: service.price,
-      description: service.description,
       category: service.category,
       duration: service.duration,
       address: service.address,
@@ -269,8 +269,7 @@ export const listServices = async (req, res) => {
       services: [
         {
           id: svc._id,
-          title: svc.title,
-          description: svc.description,
+          serviceName: svc.serviceName,
           category: svc.category,
           price: svc.price,
           duration: svc.duration,
@@ -302,36 +301,59 @@ export const getCategories = async (req, res) => {
   }
 }
 
+
 // @route   PUT /api/admin/services/:id
 // @desc    Update a service (admin only)
 // @access  Private
 export const updateService = async (req, res) => {
+  // 1) Validate incoming payload (now including `title`)
   const { errors, isValid } = validateService(req.body)
   if (!isValid) {
     return res.status(400).json({ success: false, errors })
   }
 
+  // 2) Explicitly pull in each allowed field
+  const {
+    serviceName,
+    category,
+    price,
+    duration,
+    address,
+    businessHours
+  } = req.body
+
   try {
+    // 3) Build an object with only the fields you want to update
     const updateFields = {
-      ...req.body,
+      serviceName,
+      category,
+      price,
+      duration,
+      address,
+      businessHours
     }
-    // Only allow admin to update their own service
+
+    // 4) Perform the update (only if admin owns this service)
     const service = await Service.findOneAndUpdate(
       { _id: req.params.id, admin: req.user.id },
       updateFields,
       { new: true }
     )
+
     if (!service) {
       return res
         .status(404)
         .json({ success: false, error: 'Service not found' })
     }
+
+    // 5) Return the updated document
     return res.json({ success: true, service })
   } catch (err) {
     console.error('Update service error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
 
 // @route   DELETE /api/admin/services/:id
 // @desc    Delete a service (admin only)

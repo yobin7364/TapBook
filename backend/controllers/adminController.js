@@ -63,7 +63,7 @@ export const getStats = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(5)
       .populate('customer', 'name')
-      .populate('service', 'title')
+      .populate('service', 'serviceName')
 
     const recentActivity = await Promise.all(
       recentBookings.map(async (appt) => {

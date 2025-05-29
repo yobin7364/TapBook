@@ -19,7 +19,7 @@ export const adminListAppointments = async (req, res) => {
       ...statusFilter,
     })
       .populate('customer', 'name email')
-      .populate('service', 'title category')
+      .populate('service', 'serviceName category')
 
     // Format as needed for frontend
     const formatted = appointments.map((appt) => ({
@@ -29,7 +29,7 @@ export const adminListAppointments = async (req, res) => {
         email: appt.customer.email,
       },
       service: {
-        title: appt.service.title,
+        serviceName: appt.service.serviceName,
         category: appt.service.category,
       },
       date: appt.slot.start,
@@ -177,7 +177,7 @@ export const exportBookings = async (req, res) => {
       AppointmentID: b._id.toString(),
       CustomerName: b.cust.name,
       CustomerEmail: b.cust.email,
-      ServiceTitle: b.svc.title,
+      ServiceTitle: b.svc.serviceName,
       Status: b.status,
       BookedAt: b.createdAt.toISOString(),
       ScheduledAt: b.scheduledAt?.toISOString() || '',

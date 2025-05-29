@@ -12,6 +12,10 @@ const BusinessHourSchema = new Schema(
 
 const ServiceSchema = new Schema(
   {
+    serviceName: {
+      type: String,
+      required: true
+    },
     admin: {
       type: Schema.Types.ObjectId,
       ref: 'User',

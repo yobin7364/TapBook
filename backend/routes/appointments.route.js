@@ -4,6 +4,7 @@ import { authorizeRoles } from '../middleware/roleCheck.js'
 import {
   bookAppointment,
   getUpcomingAppointments,
+  updateAppointment,
   getMyBookings,
   getMyBookingById,
   getAllBookings,
@@ -31,6 +32,13 @@ router.get(
   '/upcoming',
   passport.authenticate('jwt', { session: false }),
   getUpcomingAppointments
+)
+
+// PUT    /api/appointments/:id      
+router.put(
+  '/:id',
+  passport.authenticate('jwt',{ session:false }),
+  updateAppointment
 )
 router.get(
   '/notifications',
