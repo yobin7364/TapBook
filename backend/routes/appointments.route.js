@@ -5,6 +5,7 @@ import {
   bookAppointment,
   getUpcomingAppointments,
   updateAppointment,
+  getPastAppointments,
   getMyBookings,
   getMyBookingById,
   getAllBookings,
@@ -32,6 +33,12 @@ router.get(
   '/upcoming',
   passport.authenticate('jwt', { session: false }),
   getUpcomingAppointments
+)
+// GET    /api/appointments/past
+router.get(
+  '/past',
+  passport.authenticate('jwt', { session: false }),
+  getPastAppointments
 )
 
 // PUT    /api/appointments/:id      

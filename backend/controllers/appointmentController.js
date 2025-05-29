@@ -259,6 +259,27 @@ export const updateAppointment = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+// @route   GET /api/appointments/past
+// @desc    List all past appointments (slot.end < now) for the user
+// @access  Private (user)
+export const getPastAppointments = async (req, res) => {
+  try {
+    const now = new Date()
+    const past = await Appointment.find({
+      customer: req.user.id,
+      'slot.end': { $lt: now }
+    })
+      // bring in service details & customer info
+      .populate('service', 'serviceName price duration address')
+      .populate('customer', 'name email')
+      .sort({ 'slot.start': -1 })   // most recent first
+
+    return res.json({ success: true, past })
+  } catch (err) {
+    console.error('Get past appointments error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
 
 
 // @route   GET /api/appointments/upcoming
