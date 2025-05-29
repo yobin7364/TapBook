@@ -128,6 +128,27 @@ export const bookAppointment = async (req, res) => {
   }
 }
 
+// @route   GET /api/appointments/upcoming
+// @desc    List all future (pending/confirmed) appointments for the user
+// @access  Private (user)
+export const getUpcomingAppointments = async (req, res) => {
+  try {
+    const now = new Date()
+    const upcoming = await Appointment.find({
+      customer: req.user.id,
+      'slot.start': { $gte: now },
+      status: { $in: ['pending','confirmed'] }
+    })
+    .populate('service','title price duration address')
+    .populate('customer','name email')
+    .sort({ 'slot.start': 1 })
+
+    return res.json({ success: true, upcoming })
+  } catch (err) {
+    console.error('Get upcoming error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
 
 // @route   POST /api/appointments/summary
 // @desc    Preview booking cost and discount (does NOT save)

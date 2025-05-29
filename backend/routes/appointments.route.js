@@ -3,6 +3,7 @@ import passport from 'passport'
 import { authorizeRoles } from '../middleware/roleCheck.js'
 import {
   bookAppointment,
+  getUpcomingAppointments,
   getMyBookings,
   getMyBookingById,
   getAllBookings,
@@ -26,6 +27,11 @@ router.post(
 )
 // List all appointments for the logged-in user
 router.get('/', passport.authenticate('jwt', { session: false }), getMyBookings)
+router.get(
+  '/upcoming',
+  passport.authenticate('jwt', { session: false }),
+  getUpcomingAppointments
+)
 router.get(
   '/notifications',
   passport.authenticate('jwt', { session: false }),
