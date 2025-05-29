@@ -3,7 +3,7 @@ import { Box, Typography } from "@mui/material";
 import { useSelector } from "react-redux";
 
 const UserFooter = () => {
-  const currentRole = useSelector((state) => state.auth.user?.role[0]);
+  const currentRole = useSelector((state) => state.auth.user?.role);
 
   return (
     <Box

@@ -36,27 +36,6 @@ const Membership = () => {
     setShowToast(true);
   };
 
-  const handleRenewMembership = () => {
-    if (!membership) return;
-
-    const today = new Date();
-    const newExpiryDate = new Date();
-
-    if (membership.type === "Yearly") {
-      newExpiryDate.setFullYear(today.getFullYear() + 1);
-    } else {
-      newExpiryDate.setMonth(today.getMonth() + 1);
-    }
-
-    setMembership({
-      ...membership,
-      expiryDate: newExpiryDate.toISOString().split("T")[0],
-    });
-
-    setToastMessage(`Membership renewed successfully!`);
-    setShowToast(true);
-  };
-
   const handleCancelMembership = () => {
     setMembership(null);
     setShowCancelDialog(false);
@@ -114,12 +93,9 @@ const Membership = () => {
                   <Typography variant="h6" fontWeight="bold">
                     Yearly Plan
                   </Typography>
-                  <Typography variant="subtitle1" color="text.secondary">
-                    $120 per year
-                  </Typography>
+
                   <ul style={{ marginTop: "8px" }}>
-                    <li>Priority booking</li>
-                    <li>10% discount</li>
+                    <li>10% discount on each booking</li>
                   </ul>
                 </Box>
                 <Button
@@ -149,12 +125,9 @@ const Membership = () => {
                   <Typography variant="h6" fontWeight="bold">
                     Monthly Plan
                   </Typography>
-                  <Typography variant="subtitle1" color="text.secondary">
-                    $12 per month
-                  </Typography>
+
                   <ul style={{ marginTop: "8px" }}>
-                    <li>Priority booking</li>
-                    <li>5% discount</li>
+                    <li>5% discount on each booking</li>
                   </ul>
                 </Box>
                 <Button
@@ -173,6 +146,7 @@ const Membership = () => {
             <Typography variant="h6" fontWeight="bold">
               Current Membership
             </Typography>
+
             <Typography mt={2}>
               <strong>Type:</strong> {membership.type} Plan
             </Typography>
@@ -185,9 +159,6 @@ const Membership = () => {
 
             {/* Action Buttons */}
             <Box sx={{ display: "flex", gap: 2, mt: 4 }}>
-              <Button variant="contained" onClick={handleRenewMembership}>
-                Renew Membership
-              </Button>
               <Button
                 variant="outlined"
                 color="error"
@@ -210,7 +181,7 @@ const Membership = () => {
           <DialogContent sx={{ mt: 2 }}>
             <Typography>
               Are you sure you want to cancel your membership? You will lose
-              benefits like discounts and priority booking.
+              benefits like discounts.
             </Typography>
           </DialogContent>
           <DialogActions>

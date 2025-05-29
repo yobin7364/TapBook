@@ -7,7 +7,6 @@ import { HomePage } from "./components/pages/user/HomePage/HomePage";
 import UserNavbar from "./components/common/userNavBar";
 import UserFooter from "./components/common/UserFooter";
 import BookingPage from "./components/pages/user/BookingAppointment/BookingPage";
-import AppointmentSummary from "./components/pages/user/BookingAppointment/AppointmentSummary";
 import MyAppointments from "./components/pages/user/MyAppointments/MyAppointments";
 import UpdateAppointment from "./components/pages/user/MyAppointments/UpdateAppointment";
 import Membership from "./components/pages/user/Membership/Membership";
@@ -54,7 +53,6 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/registerForm" element={<RegisterForm />} />
         <Route path="/bookingPage" element={<BookingPage />} />
-        <Route path="/appointmentSummary" element={<AppointmentSummary />} />
 
         {currentRole == "admin" ? (
           <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>

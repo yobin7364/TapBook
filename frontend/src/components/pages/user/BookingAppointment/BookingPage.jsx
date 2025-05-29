@@ -1,7 +1,16 @@
 // BookingPage.jsx
 import React, { useState, useEffect } from "react";
-import { Box, Typography, Button, Grid, TextField } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Button,
+  Grid,
+  TextField,
+  Divider,
+  CircularProgress,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux"; // Using Redux to check authentication
 
 const getNext7Days = () => {
   const today = new Date();
@@ -23,13 +32,36 @@ const generateTimeSlots = () => {
   return slots;
 };
 
+// Mock booking data
+const bookingData = {
+  providerName: "Dr. Emily Carter",
+  providerSpecialization: "General Consultation",
+  address: "123 Health Street, Wellness City",
+  rating: 4.8,
+  appointmentDate: "2025-04-27",
+  appointmentTime: "15:30",
+  serviceCost: 100,
+  membershipDiscount: 20,
+};
+
 const BookingPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState("");
   const [availableSlots, setAvailableSlots] = useState([]);
   const [mobile, setMobile] = useState("");
+  const [name, setName] = useState("");
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentDone, setPaymentDone] = useState(false);
+
   const [note, setNote] = useState("");
-  const navigator = useNavigate();
+  const navigate = useNavigate();
+
+  const { serviceCost, membershipDiscount } = bookingData;
+
+  // Only apply discount if authenticated
+  const discountToApply = isAuthenticated ? membershipDiscount : 0;
+  const totalDue = (serviceCost || 0) - discountToApply;
 
   const dates = getNext7Days();
 
@@ -47,7 +79,7 @@ const BookingPage = () => {
     setSelectedTime("");
   }, [selectedDate]);
 
-  const handleContinue = () => {
+  const handlePayment = () => {
     if (!selectedTime || !/^\d{10}$/.test(mobile)) {
       console.log("Time or mobile not valid");
       return;
@@ -60,10 +92,17 @@ const BookingPage = () => {
     bookingDateTime.setSeconds(0);
     bookingDateTime.setMilliseconds(0);
 
-    console.log("Booking ISO Time:", bookingDateTime.toISOString());
-    console.log("Mobile:", mobile);
-    console.log("Note:", note);
-    navigator("/appointmentSummary");
+    setIsPaying(true);
+
+    setTimeout(() => {
+      setIsPaying(false);
+      setPaymentDone(true);
+
+      // Redirect after 1.5 seconds
+      setTimeout(() => {
+        navigate("/");
+      }, 1500);
+    }, 2000); // Simulate 2 seconds payment processing
   };
 
   return (
@@ -152,7 +191,21 @@ const BookingPage = () => {
         </Grid>
 
         <Grid container spacing={2} mt={4}>
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
+            <TextField
+              label="Name"
+              fullWidth
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              error={name !== "" && name.trim() === ""}
+              helperText={
+                name !== "" && name.trim() === "" ? "Name is required" : ""
+              }
+              sx={{ maxWidth: "300px" }}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={4}>
             <TextField
               label="Mobile Number"
               fullWidth
@@ -165,9 +218,10 @@ const BookingPage = () => {
                   : ""
               }
               sx={{ maxWidth: "300px" }}
+              required
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <TextField
               label="Special Note (Optional)"
               fullWidth
@@ -179,7 +233,7 @@ const BookingPage = () => {
           </Grid>
         </Grid>
 
-        <Box sx={{ p: 2, display: "flex", justifyContent: "center" }}>
+        {/* <Box sx={{ p: 2, display: "flex", justifyContent: "center" }}>
           <Button
             variant="contained"
             sx={{ px: 4 }}
@@ -188,6 +242,74 @@ const BookingPage = () => {
           >
             Continue
           </Button>
+        </Box> */}
+        <Box sx={{ margin: 10 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+            <Typography>Service Cost</Typography>
+            <Typography>${serviceCost.toFixed(2)}</Typography>
+          </Box>
+
+          {/* Only show Membership Discount if authenticated */}
+          {isAuthenticated && membershipDiscount > 0 && (
+            <Box
+              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
+            >
+              <Typography>Membership Discount</Typography>
+              <Typography sx={{ color: "green" }}>
+                -${membershipDiscount.toFixed(2)}
+              </Typography>
+            </Box>
+          )}
+
+          <Divider sx={{ my: 2 }} />
+
+          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
+            <Typography fontWeight="bold">Total Due</Typography>
+            <Typography fontWeight="bold">${totalDue.toFixed(2)}</Typography>
+          </Box>
+
+          {/* Payment Section */}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            {!paymentDone ? (
+              <>
+                <Button
+                  variant="contained"
+                  sx={{ px: 5, py: 1.2, borderRadius: 2 }}
+                  onClick={handlePayment}
+                  disabled={
+                    isPaying ||
+                    !isAuthenticated ||
+                    !selectedTime ||
+                    !/^\d{10}$/.test(mobile) ||
+                    name.trim() === ""
+                  }
+                >
+                  {isPaying ? (
+                    <CircularProgress size={24} color="inherit" />
+                  ) : (
+                    "Make Payment"
+                  )}
+                </Button>
+
+                {/* Show message if user is not logged in */}
+                {!isAuthenticated && (
+                  <Typography variant="body2" color="error" mt={2}>
+                    Please login to make a payment.
+                  </Typography>
+                )}
+              </>
+            ) : (
+              <Typography variant="h6" color="green" fontWeight="bold">
+                Payment Successful! Redirecting...
+              </Typography>
+            )}
+          </Box>
         </Box>
       </Box>
     </Box>

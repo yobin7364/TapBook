@@ -38,7 +38,7 @@ const defaultHours = daysOfWeek.reduce((acc, day) => {
 
 const ServiceSettingsPage = () => {
   const [isEditMode, setIsEditMode] = useState(false);
-  const [category, setCategory] = useState("Consulting");
+  const [category, setCategory] = useState("haircut");
   const [duration, setDuration] = useState("30 minutes");
   const [address, setAddress] = useState("123 Main St");
   const [businessHours, setBusinessHours] = useState(defaultHours);
@@ -141,9 +141,13 @@ const ServiceSettingsPage = () => {
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                     >
-                      <MenuItem value="Consulting">Consulting</MenuItem>
-                      <MenuItem value="Therapy">Therapy</MenuItem>
-                      <MenuItem value="Fitness">Fitness</MenuItem>
+                      <MenuItem value="haircut">Haircut</MenuItem>
+                      <MenuItem value="massage">Massage</MenuItem>
+                      <MenuItem value="yoga">Yoga</MenuItem>
+
+                      <MenuItem value="dentist">Dentist</MenuItem>
+                      <MenuItem value="gym">Gym</MenuItem>
+                      <MenuItem value="consultation">Consultation</MenuItem>
                     </Select>
                   </Grid>
                   <Grid item xs={12} sm={4}>
