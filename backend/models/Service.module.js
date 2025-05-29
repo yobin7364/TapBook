@@ -18,15 +18,6 @@ const ServiceSchema = new Schema(
       required: true,
       unique: true, // Each admin can have only one service
     },
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    description: {
-      type: String,
-      required: true,
-    },
     category: {
       type: String,
       required: true,

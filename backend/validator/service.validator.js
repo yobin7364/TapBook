@@ -22,15 +22,7 @@ const businessHourSchema = Joi.object({
 
 export const validateService = (data) => {
   const schema = Joi.object({
-    title: Joi.string().min(3).max(100).required().messages({
-      'string.empty': 'Title is required',
-      'string.min': 'Title must be at least 3 characters',
-      'string.max': 'Title must be at most 100 characters',
-    }),
-    description: Joi.string().min(10).required().messages({
-      'string.empty': 'Description is required',
-      'string.min': 'Description must be at least 10 characters',
-    }),
+    
     category: Joi.string().required().messages({
       'string.empty': 'Category is required',
     }),

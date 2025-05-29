@@ -12,10 +12,7 @@ export const validateAppointment = (data) => {
         'string.empty': 'Start time is required',
         'string.isoDate': 'Start time must be a valid ISO 8601 datetime',
       }),
-      end: Joi.string().isoDate().required().messages({
-        'string.empty': 'End time is required',
-        'string.isoDate': 'End time must be a valid ISO 8601 datetime',
-      }),
+      
     })
       .required()
       .messages({

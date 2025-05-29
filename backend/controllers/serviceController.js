@@ -107,8 +107,6 @@ const latestAllowed = new Date(now.getTime() + maxAdvanceDays * 86400_000)
     pipeline.push({
       $project: {
         id: '$_id',
-        title: 1,
-        description: 1,
         category: 1,
         price: 1,
         duration: 1,
@@ -184,6 +182,61 @@ export const createService = async (req, res) => {
     return res.status(201).json({ success: true, service })
   } catch (err) {
     console.error('Service creation error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
+export const getServiceById = async (req, res) => {
+  try {
+    const { id } = req.params
+    const service = await Service.findById(
+      id,
+      ' category duration address businessHours admin'
+    )
+      .populate('admin', 'name email')
+      .lean()
+
+    if (!service) {
+      return res
+        .status(404)
+        .json({ success: false, error: 'Service not found' })
+    }
+
+    // compute stats
+    const stats = await Review.aggregate([
+      { $match: { service: service._id } },
+      {
+        $group: {
+          _id: null,
+          avgRating: { $avg: '$rating' },
+          reviewCount: { $sum: 1 },
+        },
+      },
+    ])
+
+    const avgRating = stats[0]?.avgRating ?? 0
+    const reviewCount = stats[0]?.reviewCount ?? 0
+
+    // reshape and return
+    const payload = {
+      id: service._id.toString(),
+      price: service.price,
+      description: service.description,
+      category: service.category,
+      duration: service.duration,
+      address: service.address,
+      businessHours: service.businessHours,
+    admin: {
+      id:    service.admin._id.toString(),
+      name:  service.admin.name,
+      email: service.admin.email
+    },
+    avgRating,
+    reviewCount
+  }
+
+    return res.json({ success: true, service: payload })
+  } catch (err) {
+    console.error('getServiceById error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }

@@ -1,5 +1,5 @@
 import express from 'express'
-import { publicListServices } from '../controllers/serviceController.js'
+import { publicListServices,getServiceById } from '../controllers/serviceController.js'
 import { getAvailableSlots } from '../controllers/availableSlots.Controller.js'
 
 const router = express.Router()
@@ -9,5 +9,6 @@ const router = express.Router()
 // @access  Public
 router.get('/', publicListServices)
 router.get('/:id/available-slots', getAvailableSlots)
+router.get('/:id', getServiceById)
 
 export default router

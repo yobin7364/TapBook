@@ -1,68 +1,76 @@
-import Service from '../models/Service.module.js'
+// controllers/timeSlot.controller.js
+
 import Appointment from '../models/Appointment.module.js'
+import Service from '../models/Service.module.js'
+import { DateTime } from 'luxon'
 
-// @route   GET /api/services/:id/available-slots?date=YYYY-MM-DD
-// @desc    Get available appointment slots for a service on a specific date
-// @access  Public (or Private, your choice)
 export const getAvailableSlots = async (req, res) => {
-  try {
-    const { id } = req.params
-    const { date } = req.query // "YYYY-MM-DD"
+  const { id } = req.params
+  const { date } = req.query // expects "YYYY-MM-DD"
 
-    if (!date) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'Date is required (YYYY-MM-DD)' })
-    }
-
-    const service = await Service.findById(id)
-    if (!service) {
-      return res
-        .status(404)
-        .json({ success: false, error: 'Service not found' })
-    }
-
-    // Get business hours for that weekday
-    const dayName = new Date(date).toLocaleDateString('en-US', {
-      weekday: 'long',
+  if (!date) {
+    return res.status(400).json({
+      success: false,
+      error: 'Date is required (YYYY-MM-DD)',
     })
-    const hours =
-      service.businessHours.get?.(dayName) || service.businessHours[dayName] // Map or object
-
-    if (!hours || hours.closed) {
-      return res.json({ success: true, slots: [] }) // No slots if closed
-    }
-
-    // Calculate all slots for this day based on service duration
-    const [fromH, fromM] = hours.from.split(':').map(Number)
-    const [toH, toM] = hours.to.split(':').map(Number)
-    const slotDuration = service.duration // in minutes
-
-    let slots = []
-    let current = new Date(`${date}T${hours.from}`)
-    const end = new Date(`${date}T${hours.to}`)
-    while (current.getTime() + slotDuration * 60000 <= end.getTime()) {
-      slots.push(current.toTimeString().slice(0, 5)) // "HH:mm"
-      current = new Date(current.getTime() + slotDuration * 60000)
-    }
-
-    // Find booked slots for this day
-    const dayStart = new Date(`${date}T00:00:00`)
-    const dayEnd = new Date(`${date}T23:59:59.999`)
-    const booked = await Appointment.find({
-      service: service._id,
-      'slot.start': { $gte: dayStart, $lt: dayEnd },
-      status: { $in: ['pending', 'confirmed'] },
-    })
-
-    const bookedTimes = booked.map((a) =>
-      a.slot.start.toTimeString().slice(0, 5)
-    )
-    const availableSlots = slots.filter((time) => !bookedTimes.includes(time))
-
-    return res.json({ success: true, slots: availableSlots })
-  } catch (err) {
-    console.error('Get available slots error:', err)
-    return res.status(500).json({ success: false, error: 'Server error' })
   }
+
+  // 1) Load the service
+  const service = await Service.findById(id)
+  if (!service) {
+    return res.status(404).json({ success: false, error: 'Service not found' })
+  }
+
+  // 2) Determine the weekday name in Australia/Sydney
+  const dayName = DateTime.fromISO(date, { zone: 'Australia/Sydney' }).toFormat(
+    'EEEE'
+  ) // e.g. "Monday"
+
+  // 3) Grab the business hours for that day
+  const hours =
+    service.businessHours.get?.(dayName) || service.businessHours[dayName]
+  if (!hours || hours.closed) {
+    // closed all day
+    return res.json({ success: true, slots: [] })
+  }
+
+  // 4) Build the list of ALL possible slot start‐times in local zone
+  const opening = DateTime.fromISO(`${date}T${hours.from}`, {
+    zone: 'Australia/Sydney',
+  })
+  const closing = DateTime.fromISO(`${date}T${hours.to}`, {
+    zone: 'Australia/Sydney',
+  })
+  const slotDuration = service.duration // in minutes
+
+  let cursor = opening
+  const allSlots = []
+  while (cursor.plus({ minutes: slotDuration }) <= closing) {
+    allSlots.push(cursor.toFormat('HH:mm'))
+    cursor = cursor.plus({ minutes: slotDuration })
+  }
+
+  // 5) Fetch booked appointments for that service/day in UTC range
+  const dayStartUTC = opening.startOf('day').toUTC().toJSDate()
+  const dayEndUTC = opening.endOf('day').toUTC().toJSDate()
+  const booked = await Appointment.find({
+    service: id,
+    'slot.start': { $gte: dayStartUTC, $lt: dayEndUTC },
+    status: { $in: ['pending', 'confirmed'] },
+  })
+
+  // 6) Map booked appointments to local "HH:mm" strings
+  const bookedTimes = booked.map((appt) =>
+    DateTime.fromJSDate(appt.slot.start, { zone: 'utc' })
+      .setZone('Australia/Sydney')
+      .toFormat('HH:mm')
+  )
+
+  // 7) Merge into final array with availability flags
+  const slots = allSlots.map((time) => ({
+    time,
+    available: !bookedTimes.includes(time),
+  }))
+
+  return res.json({ success: true, slots })
 }

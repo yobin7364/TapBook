@@ -4,94 +4,129 @@ import { validateAppointment } from '../validator/appointment.validator.js'
 import User from '../models/User.module.js'
 import { getAppointmentSummaryData } from '../utils/appointment.utils.js'
 import { sendEmail } from '../utils/mailer.js' // or wherever your mailer is
+import Review from '../models/Review.module.js'
+
+
+
 
 // @route   POST /api/appointments
 // @desc    Book a new appointment (user)
 // @access  Private (user)
 export const bookAppointment = async (req, res) => {
-  const { errors, isValid } = validateAppointment(req.body)
-  if (!isValid) {
-    return res.status(400).json({ success: false, errors })
+  const { service, start, mobile, note } = req.body
+
+
+  // 1) Parse dates
+  const startDate = new Date(start)
+  const now       = new Date()
+  if (isNaN(startDate)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid start date'
+    })
   }
-
-  const { service, slot, mobile, note } = req.body
-
-  // --- NEW: Prevent booking in the past ---
-  const now = new Date()
-  const start = new Date(slot.start)
-  const end = new Date(slot.end)
-  if (start < now) {
+  if (startDate < now) {
     return res.status(400).json({
       success: false,
       error: 'Cannot book an appointment in the past'
     })
   }
-  // --- END NEW ---
 
   try {
-    // 1. DRY: Get price summary and business hour validation
-    const {
-      service: svc,
-      summary,
-      error,
-    } = await getAppointmentSummaryData({
-      userId: req.user.id,
+    // 2) Load service to get its duration
+    const svc = await Service.findById(service)
+    if (!svc) {
+      return res.status(404).json({ success: false, error: 'Service not found' })
+    }
+
+    // 3) Compute end using the service’s duration (in minutes)
+    const endDate = new Date(startDate.getTime() + svc.duration * 60000)
+    const slot    = { start: startDate, end: endDate }
+
+    // 4) DRY: business hours + cost summary
+    const { summary, error } = await getAppointmentSummaryData({
+      userId:    req.user.id,
       serviceId: service,
-      slot,
+      slot
     })
     if (error) {
       return res.status(400).json({ success: false, error })
     }
 
-    // 2. Prevent double-booking the same provider
+    const { serviceCost, membershipDiscount, totalDue } = summary
+
+    // 5) Prevent double-booking the same provider
     const conflict = await Appointment.findOne({
       service,
-      status: { $in: ['pending', 'confirmed'] },
-      'slot.start': { $lt: end },
-      'slot.end': { $gt: start },
+      status: { $in: ['pending','confirmed'] },
+      'slot.start': { $lt: endDate },
+      'slot.end':   { $gt: startDate }
     })
     if (conflict) {
       return res.status(400).json({
         success: false,
-        error: 'This time slot is already booked',
+        error: 'This time slot is already booked'
       })
     }
 
-    // 3. Prevent user from double-booking themselves
+    // 6) Prevent user from double-booking themselves
     const selfConflict = await Appointment.findOne({
       customer: req.user.id,
-      status: { $in: ['pending', 'confirmed'] },
-      'slot.start': { $lt: end },
-      'slot.end': { $gt: start },
+      status:   { $in: ['pending','confirmed'] },
+      'slot.start': { $lt: endDate },
+      'slot.end':   { $gt: startDate }
     })
     if (selfConflict) {
       return res.status(400).json({
         success: false,
-        error: 'You already have a booking in that time slot',
+        error: 'You already have a booking in that time slot'
       })
     }
+  // 7) Compute average service rating
+    const stats = await Review.aggregate([
+      { $match: { service: svc._id } },
+      { $group: { _id: null, avgRating: { $avg: '$rating' } } }
+    ])
+    const avgRating = stats[0]?.avgRating ?? 0
 
-    // 4. Save appointment
+    // 8) Fetch admin name
+    const adminUser = await User.findById(svc.admin).select('name').lean()
+    const adminName = adminUser?.name || 'Unknown'
+    // 7) Save the appointment, embedding payment breakdown
     const appointment = new Appointment({
-      customer: req.user.id,
+      customer:    req.user.id,
       service,
       slot,
-      scheduledAt: slot.start,
-      mobile: mobile || '',
-      note: note || '',
-      status: 'pending',
+      scheduledAt: startDate,
+      mobile,
+      note:        note || '',
+      status:      'pending',
+      payment: {
+        serviceCost,
+        membershipDiscount,
+        totalDue
+      }
     })
     await appointment.save()
+
+    // 8) Return everything in one go
     return res.status(201).json({
-      success: true,
+      success:            true,
       appointment,
-      summary, // Contains {serviceCost, membershipDiscount, totalDue}
+      serviceCost,        // e.g. 120
+      membershipDiscount, //   e.g. 6
+      totalDue  ,          //   e.g.114
+      serviceAddress: svc.address,
+      avgRating,
+      adminName
     })
+
   } catch (err) {
     console.error('Book appointment error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
 
 // @route   POST /api/appointments/summary
 // @desc    Preview booking cost and discount (does NOT save)
