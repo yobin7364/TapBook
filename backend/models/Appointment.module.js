@@ -8,6 +8,11 @@ const AppointmentSchema = new Schema(
       ref: 'User',
       required: true,
     },
+    customerName: {
+      type:String,
+      required: true
+
+    },
     service: {
       type: Schema.Types.ObjectId,
       ref: 'Service',

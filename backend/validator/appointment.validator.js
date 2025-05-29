@@ -7,12 +7,16 @@ export const validateAppointment = (data) => {
       'string.length': 'Service ID must be a valid ObjectId',
       'string.hex': 'Service ID must be a valid ObjectId',
     }),
+    customerName: Joi.string().trim().min(2).required().messages({
+      'string.empty': 'Name is required',
+      'any.required': 'Name is required',
+      'string.min': 'Name must be at least {#limit} characters',
+    }),
     slot: Joi.object({
       start: Joi.string().isoDate().required().messages({
         'string.empty': 'Start time is required',
         'string.isoDate': 'Start time must be a valid ISO 8601 datetime',
       }),
-      
     })
       .required()
       .messages({

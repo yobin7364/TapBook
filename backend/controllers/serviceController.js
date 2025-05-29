@@ -288,6 +288,19 @@ export const listServices = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+// @route   GET /api/services/categories
+// @desc    Get a list of all distinct service categories
+// @access  Public
+export const getCategories = async (req, res) => {
+  try {
+    // uses Mongo’s distinct to pull every unique category string
+    const categories = await Service.distinct('category')
+    return res.json({ success: true, categories })
+  } catch (err) {
+    console.error('Get categories error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
+}
 
 // @route   PUT /api/admin/services/:id
 // @desc    Update a service (admin only)

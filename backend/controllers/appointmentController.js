@@ -13,7 +13,7 @@ import Review from '../models/Review.module.js'
 // @desc    Book a new appointment (user)
 // @access  Private (user)
 export const bookAppointment = async (req, res) => {
-  const { service, start, mobile, note } = req.body
+  const {name, service, start, mobile, note } = req.body
 
 
   // 1) Parse dates
@@ -95,6 +95,7 @@ export const bookAppointment = async (req, res) => {
     // 7) Save the appointment, embedding payment breakdown
     const appointment = new Appointment({
       customer:    req.user.id,
+      customerName: name,
       service,
       slot,
       scheduledAt: startDate,
