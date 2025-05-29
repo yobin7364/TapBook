@@ -16,6 +16,8 @@ import adminReviewsRoutes from './routes/adminReviews.route.js'
 import adminDashboardRoutes from './routes/adminDashboard.route.js'
 import servicesRoutes from './routes/services.route.js'
 import adminAppointmentRoutes from './routes/adminAppointments.route.js'
+import membershipRoutes from './routes/membership.route.js'
+import { autoCompleteAppointments } from './utils/autoCompleteAppointments.js'
 
 dotenv.config()
 
@@ -41,6 +43,7 @@ app.use('/api/reviews', reviewRoutes)
 app.use('/api/admin/reviews', adminReviewsRoutes)
 app.use('/api/admin/dashboard', adminDashboardRoutes)
 app.use('/api/admin/appointments', adminAppointmentRoutes)
+app.use('/api/membership', membershipRoutes)
 
 import './utils/notificationScheduler.js'
 const mongoURI = keys.mongoURI
@@ -50,7 +53,9 @@ mongoose
   .connect(mongoURI)
   .then(() => console.log('MongoDB connected'))
   .catch((err) => console.log('Mongoose connection error:', err))
-
+setInterval(() => {
+  autoCompleteAppointments()
+}, 60 * 1000) // runs every minute
 const PORT = process.env.PORT || 4000
 
 app.listen(PORT, () => console.log(`Server started on port ${PORT}`))

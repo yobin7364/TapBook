@@ -2,9 +2,10 @@ import express from 'express'
 import passport from 'passport'
 import { authorizeRoles } from '../middleware/roleCheck.js'
 import {
+  adminListAppointments,
   batchUpdateStatus,
-  batchCancel,
   exportBookings,
+  batchCancelByDate
 } from '../controllers/adminAppointmentController.js'
 
 const router = express.Router()
@@ -14,6 +15,7 @@ router.use(
   passport.authenticate('jwt', { session: false }),
   authorizeRoles('admin')
 )
+router.get('/', authorizeRoles('admin'), adminListAppointments)
 
 /**
  * @route   POST /api/admin/appointments/batch
@@ -25,7 +27,11 @@ router.post('/batch', batchUpdateStatus)
  * @route   DELETE /api/admin/appointments/batch
  * @desc    Batch-cancel (delete) appointments
  */
-router.delete('/batch', batchCancel)
+router.post(
+  '/batch-cancel-by-date',
+  passport.authenticate('jwt', { session: false }),
+  batchCancelByDate
+)
 
 /**
  * @route   GET /api/admin/appointments/export

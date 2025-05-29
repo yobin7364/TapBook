@@ -3,21 +3,32 @@ import { validateService } from '../validator/service.validator.js'
 import Review from '../models/Review.module.js'
 import Appointment from '../models/Appointment.module.js'
 import { validateReview } from '../validator/review.validator.js'
-
 export const publicListServices = async (req, res) => {
   try {
-    // 1) Parse filters
-    const {
-      q, // keyword search
-      category,
-      minPrice,
-      maxPrice,
-      minRating,
-      start, // ISO date for slot start
-      end, // ISO date for slot end
-    } = req.query
+    const { q, category, minPrice, maxPrice, minRating, start, end } = req.query
+    const page = parseInt(req.query.page) > 0 ? parseInt(req.query.page) : 1
+    const limit = parseInt(req.query.limit) > 0 ? parseInt(req.query.limit) : 6
+    const skip = (page - 1) * limit
 
-    // 2) Build a Mongoose match object for services
+const now = new Date()
+const isMember =
+  !!req.user?.membership?.expiryDate &&
+  new Date(req.user.membership.expiryDate) > now &&
+  !req.user.membership.cancelled
+const maxAdvanceDays = isMember ? 14 : 0
+const latestAllowed = new Date(now.getTime() + maxAdvanceDays * 86400_000)
+
+    if (end) {
+      const requestedEnd = new Date(end)
+      if (requestedEnd > latestAllowed) {
+        return res.status(400).json({
+          success: false,
+          error: isMember
+            ? 'Members can book up to two weeks in advance.'
+            : 'You must book for today only. Subscribe for advance booking.',
+        })
+      }
+    }
     const serviceMatch = {}
     if (q) serviceMatch.title = { $regex: q, $options: 'i' }
     if (category) serviceMatch.category = category
@@ -26,10 +37,8 @@ export const publicListServices = async (req, res) => {
     if (maxPrice)
       serviceMatch.price = { ...serviceMatch.price, $lte: +maxPrice }
 
-    // 3) Start aggregation
     const pipeline = [
       { $match: serviceMatch },
-      // bring in admin info
       {
         $lookup: {
           from: 'users',
@@ -39,7 +48,6 @@ export const publicListServices = async (req, res) => {
         },
       },
       { $unwind: '$admin' },
-      // compute review stats
       {
         $lookup: {
           from: 'reviews',
@@ -67,11 +75,9 @@ export const publicListServices = async (req, res) => {
           },
         },
       },
-      // filter by rating if requested
       ...(minRating ? [{ $match: { avgRating: { $gte: +minRating } } }] : []),
     ]
 
-    // 4) If time-slot filters provided, only keep services whose admin has availability
     if (start && end) {
       const startDate = new Date(start)
       const endDate = new Date(end)
@@ -89,8 +95,8 @@ export const publicListServices = async (req, res) => {
           $match: {
             'adminDoc.availableTimeSlots': {
               $elemMatch: {
-                start: { $lt: endDate }, // slot begins before your end
-                end: { $gt: startDate }, // slot ends after your start
+                start: { $lt: endDate },
+                end: { $gt: startDate },
               },
             },
           },
@@ -98,7 +104,6 @@ export const publicListServices = async (req, res) => {
       )
     }
 
-    // 5) Project only necessary fields
     pipeline.push({
       $project: {
         id: '$_id',
@@ -107,6 +112,8 @@ export const publicListServices = async (req, res) => {
         category: 1,
         price: 1,
         duration: 1,
+        address: 1,
+        businessHours: 1,
         admin: {
           id: '$admin._id',
           name: '$admin.name',
@@ -117,14 +124,34 @@ export const publicListServices = async (req, res) => {
       },
     })
 
-    // 6) Execute and return
-    const services = await Service.aggregate(pipeline)
-    return res.json({ success: true, services })
+    // PAGINATION with $facet: services (paged), total count
+    pipeline.push({
+      $facet: {
+        results: [{ $skip: skip }, { $limit: limit }],
+        totalCount: [{ $count: 'count' }],
+      },
+    })
+
+    const data = await Service.aggregate(pipeline)
+    const services = data[0].results
+    const total = data[0].totalCount[0]?.count || 0
+
+    return res.json({
+      success: true,
+      services,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit,
+      },
+    })
   } catch (err) {
     console.error('Public list services error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
 // @route   POST /api/admin/services
 // @desc    Create a new service (admin only)
 // @access  Private
@@ -134,10 +161,24 @@ export const createService = async (req, res) => {
     return res.status(400).json({ success: false, errors })
   }
 
+  // New: enforce only one service per admin
+  const existing = await Service.findOne({ admin: req.user.id })
+  if (existing) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Admin already has a service' })
+  }
+
   try {
     const service = new Service({
-      admin: req.user.id, // ← user must be admin
-      ...req.body,
+      admin: req.user.id,
+      title: req.body.title,
+      description: req.body.description,
+      category: req.body.category,
+      price: req.body.price,
+      duration: req.body.duration,
+      address: req.body.address, // NEW
+      businessHours: req.body.businessHours, // NEW
     })
     await service.save()
     return res.status(201).json({ success: true, service })
@@ -146,53 +187,54 @@ export const createService = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
 // @route   GET /api/admin/services
 // @desc    List all services with rating info (admin view)
 // @access  Private (admin)
 export const listServices = async (req, res) => {
   try {
-    // 1) Fetch raw services
-    const services = await Service.find()
-      .populate('admin', 'name email')
-
-    // 2) For each service, compute avgRating + reviewCount
-    const results = await Promise.all(
-      services.map(async (svc) => {
-        const stats = await Review.aggregate([
-          { $match: { reviewee: svc.admin._id } },
-          {
-            $group: {
-              _id: '$reviewee',
-              avgRating:   { $avg: '$rating' },
-              reviewCount: { $sum: 1 }
-            }
-          }
-        ])
-
-        // stats[0] may be undefined if no reviews
-        const { avgRating = 0, reviewCount = 0 } = stats[0] || {}
-
-        return {
-          id:          svc._id,
-          title:       svc.title,
-          description: svc.description,
-          category:    svc.category,
-          price:       svc.price,
-          duration:    svc.duration,
-          admin:       svc.admin,
-          avgRating,
-          reviewCount
-        }
-      })
+    const svc = await Service.findOne({ admin: req.user.id }).populate(
+      'admin',
+      'name email'
     )
+    if (!svc) {
+      return res.json({ success: true, services: [] })
+    }
+    const stats = await Review.aggregate([
+      { $match: { reviewee: svc.admin._id } },
+      {
+        $group: {
+          _id: '$reviewee',
+          avgRating: { $avg: '$rating' },
+          reviewCount: { $sum: 1 },
+        },
+      },
+    ])
+    const { avgRating = 0, reviewCount = 0 } = stats[0] || {}
+    return res.json({
+      success: true,
+      services: [
+        {
+          id: svc._id,
+          title: svc.title,
+          description: svc.description,
+          category: svc.category,
+          price: svc.price,
+          duration: svc.duration,
+          address: svc.address,
+          businessHours: svc.businessHours,
+          admin: svc.admin,
+          avgRating,
+          reviewCount,
+        },
+      ],
+    })
 
-    return res.json({ success: true, services: results })
   } catch (err) {
     console.error('List services error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
-
 
 // @route   PUT /api/admin/services/:id
 // @desc    Update a service (admin only)
@@ -204,9 +246,13 @@ export const updateService = async (req, res) => {
   }
 
   try {
+    const updateFields = {
+      ...req.body,
+    }
+    // Only allow admin to update their own service
     const service = await Service.findOneAndUpdate(
-      { _id: req.params.id, admin: req.user.id }, // ← match on admin
-      req.body,
+      { _id: req.params.id, admin: req.user.id },
+      updateFields,
       { new: true }
     )
     if (!service) {
@@ -228,7 +274,7 @@ export const deleteService = async (req, res) => {
   try {
     const service = await Service.findOneAndDelete({
       _id: req.params.id,
-      admin: req.user.id, // ← match on admin
+      admin: req.user.id,
     })
     if (!service) {
       return res
@@ -253,51 +299,49 @@ export const createCustomerReview = async (req, res) => {
 
   const { appointment, rating, comment } = req.body
   try {
-    // 1) Verify appointment exists
     const appt = await Appointment.findById(appointment)
     if (!appt) {
       return res
         .status(404)
         .json({ success: false, error: 'Appointment not found' })
     }
-
-    // 2) Only the admin who owns the service can review
     const svc = await Service.findById(appt.service)
     if (!svc || svc.admin.toString() !== req.user.id) {
       return res
         .status(403)
-        .json({ success: false, error: 'Not authorized to review this customer' })
+        .json({
+          success: false,
+          error: 'Not authorized to review this customer',
+        })
     }
-
-    // 3) Only completed or cancelled appointments can be reviewed
-    if (!['confirmed','cancelled'].includes(appt.status)) {
+    if (!['confirmed', 'cancelled'].includes(appt.status)) {
       return res
         .status(400)
-        .json({ success: false, error: 'Can only review completed or cancelled appointments' })
+        .json({
+          success: false,
+          error: 'Can only review completed or cancelled appointments',
+        })
     }
-
-    // 4) Prevent duplicate review for same appointment
     if (await Review.findOne({ appointment })) {
       return res
         .status(400)
-        .json({ success: false, error: 'Review already exists for this appointment' })
+        .json({
+          success: false,
+          error: 'Review already exists for this appointment',
+        })
     }
-
-    // 5) Create the review, reviewer=req.user.id, reviewee=customer
     const review = new Review({
       appointment,
-      reviewer: req.user.id,         // admin
-      reviewee:  appt.customer,      // customer
-      service:   appt.service,
+      reviewer: req.user.id,
+      reviewee: appt.customer,
+      service: appt.service,
       rating,
-      comment
+      comment,
     })
     await review.save()
     return res.status(201).json({ success: true, review })
-
   } catch (err) {
     console.error('Create customer review error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
-

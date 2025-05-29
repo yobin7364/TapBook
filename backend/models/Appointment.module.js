@@ -17,18 +17,25 @@ const AppointmentSchema = new Schema(
       start: { type: Date, required: true },
       end: { type: Date, required: true },
     },
+    note: { type: String, default: ' '},
+    mobile: {type: String, required: true},
     scheduledAt: { type: Date},
     reminded: {type: Boolean, default: false},
     
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'declined', 'cancelled'],
+      enum: ['pending', 'confirmed', 'declined', 'cancelled', 'completed'],
       default: 'pending',
     },
+    cancelNote: {
+      type: String,
+      default: '',
+    }
   },
   {
     timestamps: true, // createdAt, updatedAt
   }
 )
+AppointmentSchema.index({ status: 1, 'slot.end': 1 })
 
 export default mongoose.model('Appointment', AppointmentSchema)

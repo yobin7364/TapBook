@@ -2,46 +2,104 @@ import mongoose from 'mongoose'
 import User from '../models/User.module.js'
 import Service from '../models/Service.module.js'
 import Appointment from '../models/Appointment.module.js'
+import Review from '../models/Review.module.js'
 
-/**
- * @route   GET /api/admin/dashboard/stats
- * @desc    Get overall system statistics
- * @access  Private (admin)
- */
 export const getStats = async (req, res) => {
   try {
-    const userCount = await User.countDocuments()
-    const serviceCount = await Service.countDocuments()
-    const bookingCount = await Appointment.countDocuments()
-
-    // Sum revenue from confirmed bookings
-    const revenueResult = await Appointment.aggregate([
-      { $match: { status: 'confirmed' } },
-      {
-        $lookup: {
-          from: 'services', // Mongo collection name
-          localField: 'service',
-          foreignField: '_id',
-          as: 'serviceData',
-        },
-      },
-      { $unwind: '$serviceData' },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$serviceData.price' },
-        },
-      },
+    // 1. Basic counts
+    const [bookingCount, userCount, serviceCount] = await Promise.all([
+      Appointment.countDocuments(),
+      User.countDocuments(),
+      // import and count your Service model if you want this
     ])
-    const totalRevenue = revenueResult[0]?.totalRevenue || 0
+
+    // 2. Active users (users with at least one booking)
+    const activeUsers = await Appointment.distinct('customer')
+    const activeUserCount = activeUsers.length
+
+    // 3. Total Revenue (sum totalDue if present, else fallback to service.price)
+    const completedBookings = await Appointment.find({
+      status: { $in: ['confirmed', 'completed'] },
+    }).populate('service')
+    const totalRevenue = completedBookings.reduce((sum, appt) => {
+      // If you store totalDue in appointment, otherwise use service.price
+      return sum + (appt.summary?.totalDue || appt.service?.price || 0)
+    }, 0)
+
+    // 4. Bookings by week (for the past 7 days, grouped by weekday)
+    const startOfWeek = (() => {
+      const d = new Date()
+      d.setHours(0, 0, 0, 0)
+      d.setDate(d.getDate() - d.getDay()) // set to Sunday
+      return d
+    })()
+
+    // All appointments in current week
+    const weekBookings = await Appointment.find({
+      createdAt: { $gte: startOfWeek },
+    })
+
+    const bookingsByWeek = [0, 0, 0, 0, 0, 0, 0] // S, M, T, W, T, F, S
+    weekBookings.forEach((appt) => {
+      const day = new Date(appt.createdAt).getDay()
+      bookingsByWeek[day]++
+    })
+
+    // 5. Booking status counts (confirmed, completed, cancelled)
+    const statuses = [
+      'confirmed',
+      'completed',
+      'cancelled',
+      'pending',
+      'scheduled',
+    ]
+    const statusCounts = {}
+    for (const status of statuses) {
+      statusCounts[status] = await Appointment.countDocuments({ status })
+    }
+
+    // 6. Recent activity (latest 5 appointments, with customer name, date, time, status, and rating)
+    const recentBookings = await Appointment.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('customer', 'name')
+      .populate('service', 'title')
+
+    const recentActivity = await Promise.all(
+      recentBookings.map(async (appt) => {
+        // Look up review for this appointment
+        const review = await Review.findOne({ appointment: appt._id })
+        return {
+          customer: appt.customer?.name || '',
+          date: appt.scheduledAt?.toISOString().split('T')[0],
+          time: appt.scheduledAt
+            ? new Date(appt.scheduledAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '',
+          status: appt.status,
+          rating: review ? review.rating : '-', // show rating if review found
+          reviewDescription: review ? review.comment : '-', // NEW: show review comment if exists
+        }
+      })
+    )
+
 
     return res.json({
       success: true,
-      stats: { userCount, serviceCount, bookingCount, totalRevenue },
+      stats: {
+        bookingCount,
+        activeUserCount,
+        totalRevenue,
+        bookingsByWeek, // array of 7 numbers [S, M, T, W, T, F, S]
+        statusCounts, // { confirmed: X, completed: Y, cancelled: Z, ... }
+        recentActivity, // array of objects as above
+      },
     })
   } catch (err) {
-    console.error('Admin stats error:', err)
-    return res.status(500).json({ success: false, error: 'Server error' })
+    console.error('Dashboard stats error:', err)
+    res.status(500).json({ success: false, error: 'Server error' })
   }
 }
 
