@@ -21,14 +21,13 @@ export const createReview = async (req, res) => {
         .status(404)
         .json({ success: false, error: 'Appointment not found or not yours' })
     }
-    if (!['confirmed', 'cancelled'].includes(appt.status)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: 'Can only review completed or cancelled appointments',
-        })
-    }
+if (appt.status !== 'completed') {
+  return res.status(400).json({
+    success: false,
+    error: 'Can only review completed appointments',
+  })
+}
+
 
     // Look up the service to find the admin who provided it
     const svc = await Service.findById(appt.service)
@@ -58,17 +57,34 @@ export const createReview = async (req, res) => {
     console.error('Create review error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
-}
-// @route   GET /api/reviews/user/:id
-// @desc    Get all reviews for a given user
+}// @route   GET /api/reviews/user/:id
+// @desc    Get all reviews for a given user (paginated)
 // @access  Public
 export const getReviewsForUser = async (req, res) => {
+  const page = parseInt(req.query.page) || 1
+  const limit = parseInt(req.query.limit) || 10
+  const skip = (page - 1) * limit
+
   try {
-    const reviews = await Review.find({ reviewee: req.params.id }).populate(
-      'reviewer',
-      'name email'
-    )
-    return res.json({ success: true, reviews })
+    // Find reviews for the provider
+    const [reviews, total] = await Promise.all([
+      Review.find({ reviewee: req.params.id })
+        .populate('reviewer', 'name email')
+        .sort({ createdAt: -1 }) // newest first
+        .skip(skip)
+        .limit(limit),
+      Review.countDocuments({ reviewee: req.params.id }),
+    ])
+
+    return res.json({
+      success: true,
+      reviews,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    })
   } catch (err) {
     console.error('Get reviews error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
@@ -133,9 +149,13 @@ export const createCustomerReview = async (req, res) => {
     }
 
     // 3) Only completed/cancelled appointments
-    if (!['confirmed','cancelled'].includes(appt.status)) {
-      return res.status(400).json({ success: false, error: 'Can only review completed or cancelled appointments' })
-    }
+   if (appt.status !== 'completed') {
+     return res.status(400).json({
+       success: false,
+       error: 'Can only review completed appointments',
+     })
+   }
+
 
     // 4) Prevent duplicate
     if (await Review.findOne({ appointment })) {

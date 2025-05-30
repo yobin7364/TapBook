@@ -17,14 +17,27 @@ const UserSchema = new Schema(
       required: true,
     },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
-    resetPasswordToken: {type: String},
-    resetTokenExpiry: {type: Date},
+    resetPasswordToken: { type: String },
+    resetTokenExpiry: { type: Date },
     availableTimeSlots: [
       {
         start: { type: Date, required: true },
         end: { type: Date, required: true },
       },
     ],
+    membership: {
+      plan: {
+        type: String,
+        enum: ['none', 'monthly', 'yearly'],
+        default: 'none',
+      },
+      startDate: Date,
+      expiryDate: Date,
+      cancelled: {
+        type: Boolean,
+        default: false,
+      },
+    },
   },
   {
     timestamps: true, // createdAt, updatedAt
