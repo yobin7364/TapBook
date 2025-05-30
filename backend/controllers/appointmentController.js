@@ -6,7 +6,7 @@ import { getAppointmentSummaryData } from '../utils/appointment.utils.js'
 import { sendEmail } from '../utils/mailer.js' // or wherever your mailer is
 import Review from '../models/Review.module.js'
 
-
+import NotificationModule from '../models/Notification.module.js'
 
 
 // @route   POST /api/appointments
@@ -264,17 +264,37 @@ export const updateAppointment = async (req, res) => {
 // @access  Private (user)
 export const getPastAppointments = async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1)
+    const limit = Math.max(parseInt(req.query.limit) || 10, 1)
+    const skip = (page - 1) * limit
     const now = new Date()
+    // 1) total count of past appointments
+    const total = await Appointment.countDocuments({
+      customer: req.user.id,
+      'slot.end': { $lt: now },
+    })
+
     const past = await Appointment.find({
       customer: req.user.id,
-      'slot.end': { $lt: now }
+      'slot.end': { $lt: now },
     })
       // bring in service details & customer info
       .populate('service', 'serviceName price duration address')
       .populate('customer', 'name email')
-      .sort({ 'slot.start': -1 })   // most recent first
+      .sort({ 'slot.start': -1 }) // most recent first
+      .skip(skip)
+      .limit(limit)
 
-    return res.json({ success: true, past })
+    return res.json({
+      success: true,
+      past,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit,
+      },
+    })
   } catch (err) {
     console.error('Get past appointments error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
@@ -470,7 +490,7 @@ export const updateAppointmentStatus = async (req, res) => {
 if (appt.status !== 'pending' && appt.status !== 'confirmed') {
   return res.status(400).json({
     success: false,
-    error: 'Only pending appointments can be updated',
+    error: 'Only pending  or confirmed appointments can be updated',
   })
 }
     appt.status = status
@@ -479,6 +499,13 @@ if (appt.status !== 'pending' && appt.status !== 'confirmed') {
     }
     await appt.save()
 
+// record an in-app notification
+await Notification.create({
+   user:        appt.customer._id,
+   type:        'status',
+   message:     `Your appointment for "${appt.service.serviceName}" was ${status}.`,
+   appointment: appt._id
+ })
 
     await appt.populate('customer', 'name email')
 
@@ -496,62 +523,57 @@ If you have questions, please contact support.`,
        })
      }
 
-     return res.json({ success: true, appointment: appt })
     return res.json({ success: true, appointment: appt })
   } catch (err) {
     console.error('Update status error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+// controllers/notification.controller.js
+import Notification from '../models/Notification.module.js'
+
 // @route   GET /api/notifications
-// @desc    List upcoming appointments (for notification, paginated)
+// @desc    List user notifications (status‐change, reminders, etc.), paginated
 // @access  Private (user)
 export const getNotifications = async (req, res) => {
-  const page = parseInt(req.query.page) || 1
-  const limit = parseInt(req.query.limit) || 10
-  const skip = (page - 1) * limit
+  const page  = Math.max(parseInt(req.query.page)  || 1, 1)
+  const limit = Math.max(parseInt(req.query.limit) || 10, 1)
+  const skip  = (page - 1) * limit
 
   try {
-    const now = new Date()
+    // 1) total count
+    const total = await Notification.countDocuments({ user: req.user.id })
 
-    // Total notifications count
-    const total = await Appointment.countDocuments({
-      customer: req.user.id,
-      'slot.start': { $gte: now },
-      status: { $in: ['pending', 'confirmed'] }
-    })
-
-    // Get paginated notifications
-    const appointments = await Appointment.find({
-      customer: req.user.id,
-      'slot.start': { $gte: now },
-      status: { $in: ['pending', 'confirmed'] }
-    })
-      .populate('service', 'serviceName')
-      .sort({ 'slot.start': 1 })
+    // 2) fetch page
+    const notes = await Notification.find({ user: req.user.id })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
+      .lean()
 
-    // Format for frontend
-    const notifications = appointments.map(appt => ({
-      serviceName: appt.service?.serviceName || 'Appointment',
-      date: appt.slot.start,
-      status: 'Upcoming',
-      id: appt._id,
+    // 3) shape for front‐end
+    const notifications = notes.map(n => ({
+      id:          n._id,
+      type:        n.type,            // 'status' or 'reminder'
+      message:     n.message,
+      appointment: n.appointment,     // optional appointment _id
+      read:        n.read,
+      date:        n.createdAt
     }))
 
-    res.json({
-      success: true,
+    return res.json({
+      success:       true,
       notifications,
       pagination: {
         total,
         page,
-        pages: Math.ceil(total / limit),
-      },
+        pages:  Math.ceil(total / limit),
+        limit
+      }
     })
   } catch (err) {
     console.error('Get notifications error:', err)
-    res.status(500).json({ success: false, error: 'Server error' })
+    return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
 
@@ -573,14 +595,26 @@ export const cancelAppointment = async (req, res) => {
       { _id: req.params.id, customer: req.user.id },
       { status: 'cancelled', cancelNote },
       { new: true }
-    );
+    ).populate('service', 'serviceName') 
+    console.log('POPULATED SERVICE:', appt.service)
+ 
     if (!appt) {
       return res.status(404).json({
         success: false,
         error: 'Appointment not found or not yours',
-      });
+      })
     }
-    return res.json({ success: true, appointment: appt });
+    // record a cancellation notification for the user
+    await Notification.create({
+      user: appt.customer,
+      type: 'status',
+      message: `Your appointment for "${
+        appt.service.serviceName 
+      }" was cancelled.`,
+      appointment: appt._id,
+      read: false,
+    })
+    return res.json({ success: true, appointment: appt })
   } catch (err) {
     console.error('Cancel appointment error:', err);
     return res.status(500).json({ success: false, error: 'Server error' });

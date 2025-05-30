@@ -114,82 +114,66 @@ export const batchCancelByDate = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
-/**
- * @route   GET /api/admin/appointments/export
- * @desc    Export bookings as CSV (optionally filtered)
- * @query   from, to, status, service, admin
- * @access  Private (admin)
- */
+//Export Bookings
 export const exportBookings = async (req, res) => {
   try {
-    const { from, to, status, service, admin } = req.query
-    const match = {}
+    const { from, to, status, service } = req.query
+    const adminId = req.user.id               // ← pulled from JWT!
+
+    // 1) build filter on createdAt, status, service
+    const match = { }
     if (from || to) {
       match.createdAt = {}
       if (from) match.createdAt.$gte = new Date(from)
-      if (to) match.createdAt.$lte = new Date(`${to}T23:59:59.999Z`)
+      if (to)   match.createdAt.$lte = new Date(`${to}T23:59:59.999Z`)
     }
-    if (status) match.status = status
+    if (status)  match.status  = status
     if (service) match.service = new mongoose.Types.ObjectId(service)
 
-    let pipeline = [{ $match: match }]
+    // 2) initial pipeline
+    const pipeline = [{ $match: match }]
 
-    if (admin) {
-      pipeline.push(
-        {
-          $lookup: {
-            from: 'services',
-            localField: 'service',
-            foreignField: '_id',
-            as: 'svc',
-          },
-        },
-        { $unwind: '$svc' },
-        { $match: { 'svc.admin': mongoose.Types.ObjectId(admin) } }
-      )
-    }
-
-    // Fetch with populated fields
-    const bookings = await Appointment.aggregate([
-      ...pipeline,
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'customer',
-          foreignField: '_id',
-          as: 'cust',
-        },
-      },
-      { $unwind: '$cust' },
-      {
-        $lookup: {
+    // 3) automatically filter to only this admin’s services
+    pipeline.push(
+      { $lookup: {
           from: 'services',
           localField: 'service',
           foreignField: '_id',
-          as: 'svc',
-        },
+          as: 'svc'
+        }
       },
       { $unwind: '$svc' },
-    ])
+      { $match: { 'svc.admin': new mongoose.Types.ObjectId(adminId) } }
+    )
 
-    // Map to flat objects for CSV
-    const data = bookings.map((b) => ({
+    // 4) join customer + service details
+    pipeline.push(
+      { $lookup: {
+          from: 'users',
+          localField: 'customer',
+          foreignField: '_id',
+          as: 'cust'
+        }
+      },
+      { $unwind: '$cust' },
+      // svc is already joined above
+    )
+
+    const bookings = await Appointment.aggregate(pipeline)
+
+    const report = bookings.map(b => ({
       AppointmentID: b._id.toString(),
-      CustomerName: b.cust.name,
+      CustomerName:  b.cust.name,
       CustomerEmail: b.cust.email,
-      ServiceTitle: b.svc.serviceName,
-      Status: b.status,
-      BookedAt: b.createdAt.toISOString(),
-      ScheduledAt: b.scheduledAt?.toISOString() || '',
+      ServiceTitle:  b.svc.
+      serviceName || b.svc.title,
+      PaymentAmount: b.payment?.totalDue ?? 0,
+      Status:        b.status,
+      BookedAt:      b.createdAt.toISOString(),
+      ScheduledAt:   b.scheduledAt?.toISOString() || ''
     }))
 
-    const fields = Object.keys(data[0] || {})
-    const parser = new Json2csvParser({ fields })
-    const csv = parser.parse(data)
-
-    res.header('Content-Type', 'text/csv')
-    res.attachment('bookings_export.csv')
-    return res.send(csv)
+    return res.json({ success: true, report, total: report.length })
   } catch (err) {
     console.error('Export error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })

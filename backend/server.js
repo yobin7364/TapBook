@@ -18,6 +18,7 @@ import servicesRoutes from './routes/services.route.js'
 import adminAppointmentRoutes from './routes/adminAppointments.route.js'
 import membershipRoutes from './routes/membership.route.js'
 import { autoCompleteAppointments } from './utils/autoCompleteAppointments.js'
+import notificationsRoutes from './routes/notifications.route.js'
 
 dotenv.config()
 
@@ -38,13 +39,14 @@ app.use('/api/admin/time-slots', adminTimeSlotsRoutes)
 app.use('/api/admin/services', adminServicesRoutes)
 app.use('/api/users', users)
 app.use('/api/appointments', appointmentRoutes)
-app.use(errorHandler)
+
 app.use('/api/reviews', reviewRoutes)
 app.use('/api/admin/reviews', adminReviewsRoutes)
 app.use('/api/admin/dashboard', adminDashboardRoutes)
 app.use('/api/admin/appointments', adminAppointmentRoutes)
 app.use('/api/membership', membershipRoutes)
-
+app.use('/api/notifications', notificationsRoutes)
+app.use(errorHandler)
 import './utils/notificationScheduler.js'
 const mongoURI = keys.mongoURI
 
