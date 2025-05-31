@@ -1,5 +1,4 @@
-// Required dependencies
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Box,
   Grid,
@@ -13,49 +12,34 @@ import {
   TableHead,
   TableRow,
   Paper,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import { Bar, Doughnut } from "react-chartjs-2";
 import "chart.js/auto";
+import { useDispatch, useSelector } from "react-redux";
+import { getDashboardData } from "../../../../action/admin/dashboardAction";
 
 const Dashboard = () => {
-  // Mock data
-  const bookingStats = [80, 60, 90, 120, 140, 100, 160];
-  const recentActivities = [
-    {
-      name: "Jacob Williams",
-      date: "April 22, 2024",
-      time: "10:00 AM",
-      status: "Confirmed",
-      rating: "4.5★",
-    },
-    {
-      name: "Emma Johnson",
-      date: "April 21, 2024",
-      time: "2:00 PM",
-      status: "Completed",
-      rating: "5★",
-    },
-    {
-      name: "Olivia Brown",
-      date: "April 20, 2024",
-      time: "11:00 AM",
-      status: "Scheduled",
-      rating: "-",
-    },
-    {
-      name: "Daniel Lee",
-      date: "April 20, 2024",
-      time: "1:30 PM",
-      status: "Cancelled",
-      rating: "-",
-    },
-  ];
+  const dispatch = useDispatch();
+
+  const { dashboardData, loadingDashboardData, errorDashboardData } =
+    useSelector((state) => state.dashboard);
+
+  useEffect(() => {
+    dispatch(getDashboardData());
+  }, [dispatch]);
+
+  const stats = dashboardData?.stats || {};
+  const bookingsByWeek = stats?.bookingsByWeek || [];
+  const statusCounts = stats?.statusCounts || {};
+  const recentActivity = stats?.recentActivity || [];
 
   const chartData = {
     labels: ["S", "M", "T", "W", "T", "F", "S"],
     datasets: [
       {
-        data: bookingStats,
+        data: bookingsByWeek,
         backgroundColor: "rgba(25, 118, 210, 0.7)",
       },
     ],
@@ -71,19 +55,48 @@ const Dashboard = () => {
   };
 
   const statusData = {
-    labels: ["Confirmed", "Completed", "Cancelled"],
+    labels: ["Confirmed", "Completed", "Cancelled", "Pending", "Scheduled"],
     datasets: [
       {
         label: "Status",
-        data: [820, 240, 180],
+        data: [
+          statusCounts.confirmed || 0,
+          statusCounts.completed || 0,
+          statusCounts.cancelled || 0,
+          statusCounts.pending || 0,
+          statusCounts.scheduled || 0,
+        ],
         backgroundColor: [
           "rgba(76, 175, 80, 0.7)",
           "rgba(255, 193, 7, 0.7)",
           "rgba(244, 67, 54, 0.7)",
+          "rgba(33, 150, 243, 0.7)",
+          "rgba(156, 39, 176, 0.7)",
         ],
       },
     ],
   };
+
+  if (loadingDashboardData) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        height="100vh"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (errorDashboardData) {
+    return (
+      <Box p={3}>
+        <Alert severity="error">{errorDashboardData}</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -99,7 +112,7 @@ const Dashboard = () => {
             <Card sx={{ backgroundColor: "#ffffff" }}>
               <CardContent>
                 <Typography variant="subtitle2">Total Bookings</Typography>
-                <Typography variant="h5">1240</Typography>
+                <Typography variant="h5">{stats.bookingCount || 0}</Typography>
               </CardContent>
             </Card>
           </Grid>
@@ -107,7 +120,9 @@ const Dashboard = () => {
             <Card sx={{ backgroundColor: "#ffffff" }}>
               <CardContent>
                 <Typography variant="subtitle2">Active Users</Typography>
-                <Typography variant="h5">350</Typography>
+                <Typography variant="h5">
+                  {stats.activeUserCount || 0}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
@@ -115,7 +130,7 @@ const Dashboard = () => {
             <Card sx={{ backgroundColor: "#ffffff" }}>
               <CardContent>
                 <Typography variant="subtitle2">Total Revenue</Typography>
-                <Typography variant="h5">$65,400</Typography>
+                <Typography variant="h5">${stats.totalRevenue || 0}</Typography>
               </CardContent>
             </Card>
           </Grid>
@@ -164,9 +179,9 @@ const Dashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {recentActivities.map((row, idx) => (
+                  {recentActivity.map((row, idx) => (
                     <TableRow key={idx}>
-                      <TableCell>{row.name}</TableCell>
+                      <TableCell>{row.customer}</TableCell>
                       <TableCell>{row.date}</TableCell>
                       <TableCell>{row.time}</TableCell>
                       <TableCell>{row.status}</TableCell>

@@ -38,12 +38,16 @@ const defaultHours = daysOfWeek.reduce((acc, day) => {
 
 const ServiceSettingsPage = () => {
   const [isEditMode, setIsEditMode] = useState(false);
-  const [category, setCategory] = useState("haircut");
-  const [duration, setDuration] = useState("30 minutes");
-  const [address, setAddress] = useState("123 Main St");
+  const [category, setCategory] = useState("");
+  const [duration, setDuration] = useState("");
+  const [address, setAddress] = useState("");
+  const [price, setPrice] = useState("");
   const [businessHours, setBusinessHours] = useState(defaultHours);
   const [tempHours, setTempHours] = useState(defaultHours);
   const [toastOpen, setToastOpen] = useState(false);
+
+  const isInitialEmpty =
+    !category && !duration && !address && (!price || Number(price) <= 0);
 
   const hasInvalidTimes = () => {
     return daysOfWeek.some((day) => {
@@ -52,8 +56,12 @@ const ServiceSettingsPage = () => {
     });
   };
 
+  const isValidPrice = (value) => {
+    return /^\d*\.?\d*$/.test(value);
+  };
+
   const handleSave = () => {
-    if (hasInvalidTimes()) return;
+    if (hasInvalidTimes() || !isValidPrice(price)) return;
     setBusinessHours(tempHours);
     setIsEditMode(false);
     setToastOpen(true);
@@ -92,49 +100,73 @@ const ServiceSettingsPage = () => {
           <Box px={4} pb={4}>
             {!isEditMode ? (
               <Box>
-                <Typography>
-                  <strong>Category:</strong> {category}
-                </Typography>
-                <Typography>
-                  <strong>Appointment Duration:</strong> {duration}
-                </Typography>
-                <Typography>
-                  <strong>Address:</strong> {address}
-                </Typography>
-                <Box
-                  mt={3}
-                  sx={{ backgroundColor: "#f5f5f5", p: 2, borderRadius: 1 }}
-                >
-                  <Typography variant="h6" fontWeight="bold" mb={1}>
-                    Business Hours
-                  </Typography>
-                  {daysOfWeek.map((day) => (
-                    <Typography key={day}>
-                      <strong>{day}:</strong>{" "}
-                      {businessHours[day].closed
-                        ? "Closed"
-                        : `${businessHours[day].from.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })} – ${businessHours[day].to.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}`}
+                {isInitialEmpty ? (
+                  <Button
+                    variant="contained"
+                    onClick={() => setIsEditMode(true)}
+                  >
+                    Add Service
+                  </Button>
+                ) : (
+                  <Box>
+                    <Typography>
+                      <strong>Category:</strong> {category}
                     </Typography>
-                  ))}
-                </Box>
-                <Button
-                  variant="contained"
-                  sx={{ mt: 3 }}
-                  onClick={() => setIsEditMode(true)}
-                >
-                  Edit
-                </Button>
+                    <Typography>
+                      <strong>Appointment Duration:</strong> {duration}
+                    </Typography>
+                    <Typography>
+                      <strong>Address:</strong> {address}
+                    </Typography>
+                    <Typography>
+                      <strong>Price:</strong> ${price}
+                    </Typography>
+                    <Box
+                      mt={3}
+                      sx={{
+                        backgroundColor: "#f5f5f5",
+                        p: 2,
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography variant="h6" fontWeight="bold" mb={1}>
+                        Business Hours
+                      </Typography>
+                      {daysOfWeek.map((day) => (
+                        <Typography key={day}>
+                          <strong>{day}:</strong>{" "}
+                          {businessHours[day].closed
+                            ? "Closed"
+                            : `${businessHours[day].from.toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                }
+                              )} – ${businessHours[day].to.toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                }
+                              )}`}
+                        </Typography>
+                      ))}
+                    </Box>
+                    <Button
+                      variant="contained"
+                      sx={{ mt: 3 }}
+                      onClick={() => setIsEditMode(true)}
+                    >
+                      Edit
+                    </Button>
+                  </Box>
+                )}
               </Box>
             ) : (
               <Box>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={3}>
                     <Typography fontWeight="bold">Category</Typography>
                     <Select
                       fullWidth
@@ -144,13 +176,12 @@ const ServiceSettingsPage = () => {
                       <MenuItem value="haircut">Haircut</MenuItem>
                       <MenuItem value="massage">Massage</MenuItem>
                       <MenuItem value="yoga">Yoga</MenuItem>
-
                       <MenuItem value="dentist">Dentist</MenuItem>
                       <MenuItem value="gym">Gym</MenuItem>
                       <MenuItem value="consultation">Consultation</MenuItem>
                     </Select>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={3}>
                     <Typography fontWeight="bold">
                       Appointment Duration
                     </Typography>
@@ -164,12 +195,25 @@ const ServiceSettingsPage = () => {
                       <MenuItem value="1 hour">1 hour</MenuItem>
                     </Select>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={3}>
                     <Typography fontWeight="bold">Address</Typography>
                     <TextField
                       fullWidth
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <Typography fontWeight="bold">Price ($)</Typography>
+                    <TextField
+                      fullWidth
+                      value={price}
+                      onChange={(e) => {
+                        if (isValidPrice(e.target.value)) {
+                          setPrice(e.target.value);
+                        }
+                      }}
+                      inputProps={{ inputMode: "decimal", pattern: "\\d*" }}
                     />
                   </Grid>
                 </Grid>
@@ -236,7 +280,7 @@ const ServiceSettingsPage = () => {
                   <Button
                     variant="contained"
                     onClick={handleSave}
-                    disabled={hasInvalidTimes()}
+                    disabled={hasInvalidTimes() || !price || Number(price) < 0}
                   >
                     Save
                   </Button>
