@@ -17,12 +17,12 @@ export const addService = createAsyncThunk(
   }
 );
 
-// Get a single service by ID
+// Get a single service
 export const getServiceById = createAsyncThunk(
-  "service/getById",
-  async (serviceId, { rejectWithValue }) => {
+  "service/single",
+  async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(`/api/services/${serviceId}`);
+      const { data } = await axios.get(`/api/services`);
       return data; // assuming API returns a service object
     } catch (error) {
       return rejectWithValue(

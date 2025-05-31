@@ -1,5 +1,4 @@
-// ConfirmedAppointments.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Table,
@@ -15,85 +14,86 @@ import {
   DialogContent,
   DialogActions,
   Typography,
-  Pagination,
+  CircularProgress,
 } from "@mui/material";
-
-const data = [
-  {
-    client: "Liam Anderson",
-    date: "April 27, 2024",
-    time: "10:30 AM",
-    phone: "0403 765 432",
-    request: "Requires interpreter",
-  },
-  {
-    client: "Sophie Lee",
-    date: "April 28, 2024",
-    time: "1:00 PM",
-    phone: "0402 876 543",
-    request: "Follow-up check",
-  },
-];
+import { useDispatch, useSelector } from "react-redux";
+import { getAppointmentsByStatus } from "../../../../action/admin/manageAppointment";
 
 const ConfirmedAppointments = () => {
+  const dispatch = useDispatch();
+
   const [viewOpen, setViewOpen] = useState(false);
-  const [actionOpen, setActionOpen] = useState(false);
-  const [actionType, setActionType] = useState("");
   const [selected, setSelected] = useState(null);
+
+  const {
+    appointmentsByStatus: { appointments },
+    loadingAppointmentByStatus,
+  } = useSelector((state) => state.manageAppointment);
+
+  // Auto-fetch confirmed appointments on mount
+  useEffect(() => {
+    dispatch(getAppointmentsByStatus("confirmed"));
+  }, [dispatch]);
 
   const handleView = (row) => {
     setSelected(row);
     setViewOpen(true);
   };
 
-  const handleAction = (row, type) => {
-    setSelected(row);
-    setActionType(type);
-    setActionOpen(true);
-  };
-
   const handleClose = () => {
     setViewOpen(false);
-    setActionOpen(false);
     setSelected(null);
   };
 
   return (
     <Box maxWidth="1280px" minWidth="768px" mx="auto">
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead sx={{ backgroundColor: "#424242" }}>
-            <TableRow>
-              <TableCell sx={{ color: "#fff" }}>Client</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Date</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Time</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Action</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {data.map((row, index) => (
-              <TableRow key={index}>
-                <TableCell>{row.client}</TableCell>
-                <TableCell>{row.date}</TableCell>
-                <TableCell>{row.time}</TableCell>
-                <TableCell>
-                  <Button onClick={() => handleView(row)}>View</Button>
-                  <Button
-                    color="error"
-                    onClick={() => handleAction(row, "Decline")}
-                  >
-                    Decline
-                  </Button>
-                </TableCell>
+      {loadingAppointmentByStatus ? (
+        <Box textAlign="center" mt={4}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead sx={{ backgroundColor: "#424242" }}>
+              <TableRow>
+                <TableCell sx={{ color: "#fff" }}>Client</TableCell>
+                <TableCell sx={{ color: "#fff" }}>Date</TableCell>
+                <TableCell sx={{ color: "#fff" }}>Time</TableCell>
+                <TableCell sx={{ color: "#fff" }}>Action</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {appointments?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    No confirmed appointments.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                appointments?.map((row) => {
+                  const localDate = new Date(row.date);
+                  const formattedDate = localDate.toLocaleDateString();
+                  const formattedTime = localDate.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
 
-      <Box display="flex" justifyContent="center" mt={2}>
-        <Pagination count={1} />
-      </Box>
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.client.name}</TableCell>
+                      <TableCell>{formattedDate}</TableCell>
+                      <TableCell>{formattedTime}</TableCell>
+                      <TableCell>
+                        <Button onClick={() => handleView(row)}>View</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
       {/* View Dialog */}
       <Dialog open={viewOpen} onClose={handleClose}>
@@ -104,46 +104,26 @@ const ConfirmedAppointments = () => {
           {selected && (
             <>
               <Typography>
-                <strong>Client:</strong> {selected.client}
+                <strong>Client:</strong> {selected.client.name}
               </Typography>
               <Typography>
-                <strong>Date:</strong> {selected.date}
+                <strong>Email:</strong> {selected.client.email}
               </Typography>
               <Typography>
-                <strong>Time:</strong> {selected.time}
+                <strong>Service:</strong> {selected.service.serviceName}
               </Typography>
               <Typography>
-                <strong>Phone:</strong> {selected.phone}
+                <strong>Date:</strong>{" "}
+                {new Date(selected.date).toLocaleString()}
               </Typography>
               <Typography>
-                <strong>Special Request:</strong> {selected.request}
+                <strong>Status:</strong> {selected.status}
               </Typography>
             </>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Close</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Action Confirm Dialog */}
-      <Dialog open={actionOpen} onClose={handleClose}>
-        <DialogTitle sx={{ backgroundColor: "#c62828", color: "#fff", mb: 1 }}>
-          {actionType} Confirmation
-        </DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to <strong>{actionType.toLowerCase()}</strong>{" "}
-            this appointment with <strong>{selected?.client}</strong> on{" "}
-            <strong>{selected?.date}</strong> at{" "}
-            <strong>{selected?.time}</strong>?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleClose} color="error">
-            {actionType}
-          </Button>
         </DialogActions>
       </Dialog>
     </Box>

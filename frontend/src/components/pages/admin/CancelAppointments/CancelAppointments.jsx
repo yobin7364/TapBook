@@ -1,41 +1,66 @@
-// Install needed libraries first if not installed:
-// npm install @mui/material @mui/x-date-pickers dayjs
-
-import React, { useState } from "react";
-import { Box, Button, TextField, Typography } from "@mui/material";
-import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  CircularProgress,
+} from "@mui/material";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import EventBusyIcon from "@mui/icons-material/EventBusy";
 import dayjs from "dayjs";
+import { useDispatch, useSelector } from "react-redux";
+
+import { cancelAppointmentsBatch } from "../../../../action/admin/dashboardAction";
+import CommonToast from "../../../common/CommonToast";
 
 const CancelAppointment = () => {
-  const [startDateTime, setStartDateTime] = useState(null);
-  const [endDateTime, setEndDateTime] = useState(null);
+  const dispatch = useDispatch();
 
-  const handleStartChange = (newValue) => {
-    setStartDateTime(newValue);
-    if (endDateTime && newValue && dayjs(newValue).isAfter(endDateTime)) {
-      setEndDateTime(null);
-    }
-  };
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
-  const handleEndChange = (newValue) => {
-    if (startDateTime && newValue && dayjs(newValue).isBefore(startDateTime)) {
-      alert("End DateTime cannot be before Start DateTime");
-      return;
+  const { loadingBatchCancel, successBatchCancel, errorBatchCancel } =
+    useSelector((state) => state.dashboard);
+
+  useEffect(() => {
+    if (successBatchCancel) {
+      setSnackbarMessage("Appointments cancelled successfully.");
+      setSnackbarSeverity("success");
+      setOpenSnackbar(true);
+      setSelectedDate(null);
     }
-    setEndDateTime(newValue);
-  };
+
+    if (errorBatchCancel) {
+      setSnackbarMessage(
+        typeof errorBatchCancel === "string"
+          ? errorBatchCancel
+          : "Something went wrong"
+      );
+      setSnackbarSeverity("error");
+      setOpenSnackbar(true);
+    }
+  }, [successBatchCancel, errorBatchCancel]);
 
   const handleBatchCancel = () => {
-    console.log(
-      "Batch cancel from:",
-      startDateTime?.format(),
-      "to:",
-      endDateTime?.format()
-    );
-    // Add your API logic here
+    if (!selectedDate) return;
+
+    const formattedDate = dayjs(selectedDate)
+      .hour(6)
+      .minute(0)
+      .second(0)
+      .millisecond(0)
+      .toISOString();
+
+    dispatch(cancelAppointmentsBatch({ givenDate: { start: formattedDate } }));
+  };
+
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
   };
 
   return (
@@ -46,23 +71,13 @@ const CancelAppointment = () => {
       </Box>
 
       <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <Box display="flex" flexDirection="column" gap={2}>
-          <DateTimePicker
-            label="Start Date & Time"
-            value={startDateTime}
-            onChange={handleStartChange}
-            disablePast
-            renderInput={(params) => <TextField {...params} />}
-          />
-          <DateTimePicker
-            label="End Date & Time"
-            value={endDateTime}
-            onChange={handleEndChange}
-            disablePast
-            minDateTime={startDateTime || undefined}
-            renderInput={(params) => <TextField {...params} />}
-          />
-        </Box>
+        <DatePicker
+          label="Select Date"
+          value={selectedDate}
+          onChange={(newDate) => setSelectedDate(newDate)}
+          disablePast
+          renderInput={(params) => <TextField fullWidth {...params} />}
+        />
       </LocalizationProvider>
 
       <Box mt={4}>
@@ -70,12 +85,20 @@ const CancelAppointment = () => {
           variant="contained"
           color="error"
           fullWidth
-          disabled={!startDateTime || !endDateTime}
           onClick={handleBatchCancel}
+          disabled={!selectedDate || loadingBatchCancel}
+          startIcon={loadingBatchCancel && <CircularProgress size={20} />}
         >
-          Cancel Appointments
+          {loadingBatchCancel ? "Cancelling..." : "Cancel Appointments"}
         </Button>
       </Box>
+
+      <CommonToast
+        open={openSnackbar}
+        message={snackbarMessage}
+        severity={snackbarSeverity}
+        onClose={handleCloseSnackbar}
+      />
     </Box>
   );
 };

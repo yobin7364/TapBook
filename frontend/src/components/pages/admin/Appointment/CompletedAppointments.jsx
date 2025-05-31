@@ -1,5 +1,4 @@
-// CompletedAppointments.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Table,
@@ -15,31 +14,25 @@ import {
   DialogContent,
   DialogActions,
   Typography,
-  Pagination,
+  CircularProgress,
 } from "@mui/material";
-
-const data = [
-  {
-    client: "Ava Wilson",
-    date: "April 20, 2024",
-    time: "3:00 PM",
-    phone: "0404 321 654",
-    request: "N/A",
-    rating: "5★",
-  },
-  {
-    client: "Noah Harris",
-    date: "April 21, 2024",
-    time: "4:30 PM",
-    phone: "0405 432 765",
-    request: "Bring documents",
-    rating: "4★",
-  },
-];
+import { useDispatch, useSelector } from "react-redux";
+import { getAppointmentsByStatus } from "../../../../action/admin/manageAppointment";
 
 const CompletedAppointments = () => {
+  const dispatch = useDispatch();
+
   const [viewOpen, setViewOpen] = useState(false);
   const [selected, setSelected] = useState(null);
+
+  const {
+    appointmentsByStatus: { appointments },
+    loadingAppointmentByStatus,
+  } = useSelector((state) => state.manageAppointment);
+
+  useEffect(() => {
+    dispatch(getAppointmentsByStatus("completed"));
+  }, [dispatch]);
 
   const handleView = (row) => {
     setSelected(row);
@@ -53,36 +46,57 @@ const CompletedAppointments = () => {
 
   return (
     <Box maxWidth="1280px" minWidth="768px" mx="auto">
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead sx={{ backgroundColor: "#424242" }}>
-            <TableRow>
-              <TableCell sx={{ color: "#fff" }}>Client</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Date</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Time</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Rating</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Action</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {data.map((row, index) => (
-              <TableRow key={index}>
-                <TableCell>{row.client}</TableCell>
-                <TableCell>{row.date}</TableCell>
-                <TableCell>{row.time}</TableCell>
-                <TableCell>{row.rating}</TableCell>
-                <TableCell>
-                  <Button onClick={() => handleView(row)}>View</Button>
-                </TableCell>
+      {loadingAppointmentByStatus ? (
+        <Box textAlign="center" mt={4}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead sx={{ backgroundColor: "#424242" }}>
+              <TableRow>
+                <TableCell sx={{ color: "#fff" }}>Client</TableCell>
+                <TableCell sx={{ color: "#fff" }}>Date</TableCell>
+                <TableCell sx={{ color: "#fff" }}>Time</TableCell>
+                <TableCell sx={{ color: "#fff" }}>Rating</TableCell>
+                <TableCell sx={{ color: "#fff" }}>Action</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {appointments?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">
+                    No completed appointments.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                appointments.map((row) => {
+                  const dateObj = new Date(row.date);
+                  const formattedDate = dateObj.toLocaleDateString();
+                  const formattedTime = dateObj.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
 
-      <Box display="flex" justifyContent="center" mt={2}>
-        <Pagination count={1} />
-      </Box>
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.client.name}</TableCell>
+                      <TableCell>{formattedDate}</TableCell>
+                      <TableCell>{formattedTime}</TableCell>
+                      <TableCell>
+                        {row.rating ? `${row.rating}★` : "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        <Button onClick={() => handleView(row)}>View</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
       {/* View Dialog */}
       <Dialog open={viewOpen} onClose={handleClose}>
@@ -93,22 +107,25 @@ const CompletedAppointments = () => {
           {selected && (
             <>
               <Typography>
-                <strong>Client:</strong> {selected.client}
+                <strong>Client:</strong> {selected.client.name}
               </Typography>
               <Typography>
-                <strong>Date:</strong> {selected.date}
+                <strong>Email:</strong> {selected.client.email}
               </Typography>
               <Typography>
-                <strong>Time:</strong> {selected.time}
+                <strong>Date:</strong>{" "}
+                {new Date(selected.date).toLocaleString()}
               </Typography>
               <Typography>
-                <strong>Phone:</strong> {selected.phone}
+                <strong>Phone:</strong> {selected.client.phone || "N/A"}
               </Typography>
               <Typography>
-                <strong>Special Request:</strong> {selected.request}
+                <strong>Special Request:</strong>{" "}
+                {selected.specialRequest || "None"}
               </Typography>
               <Typography>
-                <strong>Rating:</strong> {selected.rating}
+                <strong>Rating:</strong>{" "}
+                {selected.rating ? `${selected.rating}★` : "N/A"}
               </Typography>
             </>
           )}
