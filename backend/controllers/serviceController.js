@@ -509,7 +509,27 @@ export const deleteService = async (req, res) => {
     console.error('Delete service error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
+}// in controllers/service.controller.js
+export const getMyService = async (req, res) => {
+  try {
+    // Find the service document where admin === current user
+    const svc = await Service.findOne({ admin: req.user.id })
+      .select('serviceName price category duration address businessHours')
+      .lean()
+
+    if (!svc) {
+      return res
+        .status(404)
+        .json({ success: false, error: 'You have not created a service yet' })
+    }
+
+    return res.json({ success: true, service: svc })
+  } catch (err) {
+    console.error('Get my service error:', err)
+    return res.status(500).json({ success: false, error: 'Server error' })
+  }
 }
+
 
 // @route   POST /api/admin/reviews
 // @desc    Submit a review of a customer (admin only)
