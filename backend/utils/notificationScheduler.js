@@ -36,7 +36,7 @@ cron.schedule('* * * * *', async () => {
       reminded: { $ne: true },
     })
       .populate('customer', 'email name')
-      .populate('service', 'title')
+      .populate('service', 'serviceName')
 
     // DEBUG: how many did we find?
     console.log('    → found', appts.length, 'appointment(s) to remind')
@@ -55,11 +55,11 @@ cron.schedule('* * * * *', async () => {
       // Send reminder email
       await sendEmail({
         to: appt.customer.email,
-        subject: `Reminder: Upcoming appointment for ${appt.service.title}`,
+        subject: `Reminder: Upcoming appointment for ${appt.service.serviceName}`,
         text: `Hi ${
           appt.customer.name
         },\n\nThis is a reminder for your upcoming "${
-          appt.service.title
+          appt.service.serviceName
         }" booking on ${appt.scheduledAt.toLocaleString('en-AU', {
           timeZone: 'Australia/Sydney',
           hour12: false,
