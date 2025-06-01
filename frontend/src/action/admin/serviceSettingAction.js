@@ -20,10 +20,10 @@ export const addService = createAsyncThunk(
 // Get a single service
 export const getServiceById = createAsyncThunk(
   "service/single",
-  async (_, { rejectWithValue }) => {
+  async ({ serviceId }, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(`/api/services`);
-      return data; // assuming API returns a service object
+      const { data } = await axios.get(`/api/services/${serviceId}`);
+      return data;
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.errors || "Failed to load service"
@@ -41,10 +41,27 @@ export const updateServiceById = createAsyncThunk(
         `/api/admin/services/${serviceId}`,
         updatedData
       );
-      return data; // assuming API returns the updated service
+      return data; //
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.errors || "Failed to update service"
+      );
+    }
+  }
+);
+
+// get Available Slots By Date
+export const getAvailableSlotsByDate = createAsyncThunk(
+  "service/availableSlots",
+  async ({ serviceId, date }, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get(
+        `/api/services/${serviceId}/available-slots?date=${date}`
+      );
+      return data; //
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.errors || "Failed to load available slots"
       );
     }
   }

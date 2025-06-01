@@ -10,7 +10,11 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux"; // Using Redux to check authentication
+import { useDispatch, useSelector } from "react-redux";
+import { getServiceById } from "../../../../action/admin/serviceSettingAction";
+import { useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { getMembership } from "../../../../action/customer/membershipAction";
 
 const getNext7Days = () => {
   const today = new Date();
@@ -51,17 +55,29 @@ const BookingPage = () => {
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+
+  const { service, loadingSingleService } = useSelector(
+    (state) => state.service.singleService || {}
+  );
+
+  const { currentMembership, loadingMembership } = useSelector(
+    (state) => state.membership || {}
+  );
+
+  const location = useLocation();
+  const serviceCost = location.state?.price;
+
   const [isPaying, setIsPaying] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
+  const dispatch = useDispatch();
 
   const [note, setNote] = useState("");
   const navigate = useNavigate();
 
-  const { serviceCost, membershipDiscount } = bookingData;
+  const { serviceId } = useParams(); // this grabs the serviceId from the URL
 
-  // Only apply discount if authenticated
-  const discountToApply = isAuthenticated ? membershipDiscount : 0;
-  const totalDue = (serviceCost || 0) - discountToApply;
+  const [membershipDiscount, setMembershipDiscount] = useState(0);
+  const [totalDue, setTotalDue] = useState(0);
 
   const dates = getNext7Days();
 
@@ -78,6 +94,45 @@ const BookingPage = () => {
     setAvailableSlots(todaySlots);
     setSelectedTime("");
   }, [selectedDate]);
+
+  useEffect(() => {
+    dispatch(getMembership());
+    if (serviceId) {
+      dispatch(getServiceById({ serviceId }));
+    }
+  }, [dispatch, serviceId]);
+
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      currentMembership?.success &&
+      !currentMembership?.membership?.cancelled
+    ) {
+      const plan = currentMembership.membership.plan;
+
+      let discount = 0;
+
+      if (plan === "yearly") {
+        discount = 10; // 10% for yearly
+      } else if (plan === "monthly") {
+        discount = 5; // 5% for monthly
+      }
+
+      setMembershipDiscount(discount);
+
+      if (serviceCost) {
+        const calculatedDiscount = (serviceCost * discount) / 100;
+        const finalAmount = serviceCost - calculatedDiscount;
+
+        setMembershipDiscount(calculatedDiscount);
+        setTotalDue(finalAmount);
+      }
+    } else {
+      // If not authenticated or membership inactive
+      setMembershipDiscount(0);
+      setTotalDue(serviceCost || 0);
+    }
+  }, [isAuthenticated, currentMembership, serviceCost]);
 
   const handlePayment = () => {
     if (!selectedTime || !/^\d{10}$/.test(mobile)) {
@@ -126,23 +181,40 @@ const BookingPage = () => {
           boxShadow: 3,
         }}
       >
-        <Typography variant="h5" fontWeight="bold" gutterBottom>
-          Book Appointment
-        </Typography>
-        <Typography variant="subtitle1" color="text.primary" fontWeight="bold">
-          General Consultation
-        </Typography>
-        <Typography variant="subtitle2" color="text.primary" fontWeight="bold">
-          Dr. Emily Carter
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
-          <Typography sx={{ color: "orange", mr: 1, fontWeight: "bold" }}>
-            ⭐ 4.8
-          </Typography>
-          <Typography variant="body2" color="text.primary" fontWeight="bold">
-            123 Health Street, Wellness City
-          </Typography>
-        </Box>
+        {!loadingSingleService && (
+          <>
+            <Typography variant="h5" fontWeight="bold" gutterBottom>
+              Book Appointment
+            </Typography>
+            <Typography
+              variant="subtitle1"
+              sx={{ color: "primary.main", fontWeight: "bold" }}
+            >
+              {service?.category?.charAt(0).toUpperCase() +
+                service?.category?.slice(1)}
+            </Typography>
+
+            <Typography
+              variant="subtitle2"
+              sx={{ color: "secondary.main", fontWeight: "bold" }}
+            >
+              {service?.admin?.name.charAt(0).toUpperCase() +
+                service?.admin?.name.slice(1)}
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+              <Typography sx={{ color: "orange", mr: 1, fontWeight: "bold" }}>
+                ⭐ {service?.avgRating}
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.primary"
+                fontWeight="bold"
+              >
+                {service?.singleServiceData?.address}
+              </Typography>
+            </Box>
+          </>
+        )}
         <Box sx={{ height: "1px", backgroundColor: "#ccc", mt: 2 }} />
 
         <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
@@ -246,7 +318,7 @@ const BookingPage = () => {
         <Box sx={{ margin: 10 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
             <Typography>Service Cost</Typography>
-            <Typography>${serviceCost.toFixed(2)}</Typography>
+            <Typography>${serviceCost?.toFixed(2)}</Typography>
           </Box>
 
           {/* Only show Membership Discount if authenticated */}
@@ -254,7 +326,13 @@ const BookingPage = () => {
             <Box
               sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
             >
-              <Typography>Membership Discount</Typography>
+              <Typography>
+                Membership Discount
+                {currentMembership?.membership?.plan === "yearly" &&
+                  " (10% - Yearly Plan)"}
+                {currentMembership?.membership?.plan === "monthly" &&
+                  " (5% - Monthly Plan)"}
+              </Typography>
               <Typography sx={{ color: "green" }}>
                 -${membershipDiscount.toFixed(2)}
               </Typography>

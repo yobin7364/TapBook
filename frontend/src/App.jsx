@@ -52,7 +52,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/registerForm" element={<RegisterForm />} />
-        <Route path="/bookingPage" element={<BookingPage />} />
+        <Route path="/bookingPage/:serviceId" element={<BookingPage />} />
 
         {currentRole == "admin" ? (
           <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
