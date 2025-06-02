@@ -11,7 +11,7 @@ export const addService = createAsyncThunk(
       return data;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data?.errors || "Failed to add service"
+        error.response?.data?.error || "Failed to add service"
       );
     }
   }
@@ -26,7 +26,7 @@ export const getServiceById = createAsyncThunk(
       return data;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data?.errors || "Failed to load service"
+        error.response?.data?.error || "Failed to load service"
       );
     }
   }
@@ -44,7 +44,7 @@ export const updateServiceById = createAsyncThunk(
       return data; //
     } catch (error) {
       return rejectWithValue(
-        error.response?.data?.errors || "Failed to update service"
+        error.response?.data?.error || "Failed to update service"
       );
     }
   }
@@ -61,7 +61,22 @@ export const getAvailableSlotsByDate = createAsyncThunk(
       return data; //
     } catch (error) {
       return rejectWithValue(
-        error.response?.data?.errors || "Failed to load available slots"
+        error.response?.data?.error || "Failed to load available slots"
+      );
+    }
+  }
+);
+
+// get my service
+export const getMyService = createAsyncThunk(
+  "service/admin/details",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get(`/api/services/me`);
+      return data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to my service "
       );
     }
   }

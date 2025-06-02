@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -8,39 +8,113 @@ import {
   DialogContent,
   DialogActions,
   Grid,
+  Backdrop,
+  CircularProgress,
 } from "@mui/material";
 import CommonToast from "../../../common/CommonToast";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  getMembership,
+  cancelMembership,
+  subscribeMembership,
+} from "../../../../action/customer/membershipAction";
+import { resetMembershipStatus } from "../../../../redux/membershipSlice";
 
 const Membership = () => {
-  const [membership, setMembership] = useState(null); // No membership initially
+  const dispatch = useDispatch();
+  const [membership, setMembership] = useState(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [toastSeverity, setToastSeverity] = useState("success");
 
-  const handleBuyMembership = (plan) => {
-    const today = new Date();
-    const expiryDate = new Date();
-    if (plan === "Yearly") {
-      expiryDate.setFullYear(today.getFullYear() + 1);
+  const {
+    currentMembership,
+    loadingMembership,
+    subscribing,
+    subscriptionSuccess,
+    canceling,
+    cancelSuccess,
+    cancelError,
+  } = useSelector((state) => state?.membership);
+
+  // Fetch membership on mount
+  useEffect(() => {
+    dispatch(getMembership());
+  }, [dispatch]);
+
+  // Update local membership state
+  useEffect(() => {
+    if (currentMembership?.membership?.plan === "none") {
+      setMembership(null);
     } else {
-      expiryDate.setMonth(today.getMonth() + 1);
+      const planType = currentMembership?.membership?.plan;
+      const expiryDate = currentMembership?.membership?.expiryDate;
+      const discount = planType === "yearly" ? 10 : 5;
+      const cancelled = currentMembership?.membership?.cancelled;
+
+      setMembership({
+        type: planType
+          ? planType.charAt(0).toUpperCase() + planType.slice(1)
+          : null,
+        discount,
+        expiryDate,
+        cancelled,
+      });
     }
+  }, [currentMembership]);
 
-    setMembership({
-      type: plan,
-      discount: plan === "Yearly" ? 10 : 5, // 10% discount for Yearly, 5% for Monthly
-      expiryDate: expiryDate.toISOString().split("T")[0],
-    });
+  // Success message for subscription
+  useEffect(() => {
+    if (subscriptionSuccess) {
+      setToastMessage("Membership subscribed successfully!");
+      setToastSeverity("success");
+      setShowToast(true);
+    }
+  }, [subscriptionSuccess]);
 
-    setToastMessage(`Membership (${plan}) purchased successfully!`);
-    setShowToast(true);
+  // Success message for cancellation
+  useEffect(() => {
+    if (cancelSuccess) {
+      setShowCancelDialog(false);
+      setToastMessage("Membership cancelled successfully!");
+      setToastSeverity("success");
+      setShowToast(true);
+      // Reset the cancelSuccess flag to avoid it being true on page revisit
+      dispatch(resetMembershipStatus());
+      dispatch(getMembership());
+    }
+  }, [cancelSuccess, dispatch]);
+
+  // Error message for cancellation
+  useEffect(() => {
+    if (cancelError) {
+      setToastMessage("Failed to cancel membership. Try again.");
+      setToastSeverity("error");
+      setShowToast(true);
+    }
+  }, [cancelError]);
+
+  // Buy plan handler
+  const handleBuyMembership = (plan) => {
+    dispatch(subscribeMembership({ plan: plan.toLowerCase() }))
+      .unwrap()
+      .then(() => {
+        dispatch(getMembership());
+        setToastMessage(`Membership (${plan}) purchased successfully!`);
+        setToastSeverity("success");
+        setShowToast(true);
+      })
+      .catch(() => {
+        setToastMessage("Failed to subscribe. Please try again.");
+        setToastSeverity("error");
+        setShowToast(true);
+      });
   };
 
+  // Cancel handler
   const handleCancelMembership = () => {
-    setMembership(null);
-    setShowCancelDialog(false);
-    setToastMessage("Membership cancelled successfully!");
-    setShowToast(true);
+    dispatch(cancelMembership());
   };
 
   const formatDate = (dateString) => {
@@ -73,10 +147,9 @@ const Membership = () => {
           Membership Subscription
         </Typography>
 
-        {/* If no membership */}
-        {!membership ? (
+        {!loadingMembership &&
+        currentMembership?.membership?.plan === "none" ? (
           <Grid container spacing={3} mt={2}>
-            {/* Yearly Plan */}
             <Grid item xs={12} md={6}>
               <Box
                 sx={{
@@ -93,7 +166,6 @@ const Membership = () => {
                   <Typography variant="h6" fontWeight="bold">
                     Yearly Plan
                   </Typography>
-
                   <ul style={{ marginTop: "8px" }}>
                     <li>10% discount on each booking</li>
                   </ul>
@@ -108,7 +180,6 @@ const Membership = () => {
               </Box>
             </Grid>
 
-            {/* Monthly Plan */}
             <Grid item xs={12} md={6}>
               <Box
                 sx={{
@@ -125,7 +196,6 @@ const Membership = () => {
                   <Typography variant="h6" fontWeight="bold">
                     Monthly Plan
                   </Typography>
-
                   <ul style={{ marginTop: "8px" }}>
                     <li>5% discount on each booking</li>
                   </ul>
@@ -141,33 +211,46 @@ const Membership = () => {
             </Grid>
           </Grid>
         ) : (
-          // If user has membership
-          <Box mt={4}>
-            <Typography variant="h6" fontWeight="bold">
-              Current Membership
-            </Typography>
+          membership && (
+            <Box mt={4}>
+              <Typography variant="h6" fontWeight="bold">
+                Current Membership
+              </Typography>
+              {currentMembership?.membership?.cancelled && (
+                <Typography
+                  variant="body2"
+                  color="error"
+                  fontStyle="italic"
+                  gutterBottom
+                >
+                  Auto-renewal has been cancelled. Your membership will expire
+                  at the end of the current period.
+                </Typography>
+              )}
+              <Typography mt={2}>
+                <strong>Type:</strong> {membership?.type} Plan
+              </Typography>
+              <Typography>
+                <strong>Discount:</strong> {membership?.discount}% off
+              </Typography>
+              <Typography>
+                <strong>Expiry Date:</strong>{" "}
+                {formatDate(membership?.expiryDate)}
+              </Typography>
 
-            <Typography mt={2}>
-              <strong>Type:</strong> {membership.type} Plan
-            </Typography>
-            <Typography>
-              <strong>Discount:</strong> {membership.discount}% off
-            </Typography>
-            <Typography>
-              <strong>Expiry Date:</strong> {formatDate(membership.expiryDate)}
-            </Typography>
-
-            {/* Action Buttons */}
-            <Box sx={{ display: "flex", gap: 2, mt: 4 }}>
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={() => setShowCancelDialog(true)}
-              >
-                Cancel Membership
-              </Button>
+              {!currentMembership?.membership?.cancelled && (
+                <Box sx={{ display: "flex", gap: 2, mt: 4 }}>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={() => setShowCancelDialog(true)}
+                  >
+                    Cancel Membership
+                  </Button>
+                </Box>
+              )}
             </Box>
-          </Box>
+          )
         )}
 
         {/* Cancel Confirmation Dialog */}
@@ -196,9 +279,17 @@ const Membership = () => {
         <CommonToast
           open={showToast}
           message={toastMessage}
-          severity="success"
+          severity={toastSeverity}
           onClose={() => setShowToast(false)}
         />
+
+        {/* Loading Backdrop */}
+        <Backdrop
+          sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+          open={subscribing || canceling}
+        >
+          <CircularProgress color="inherit" />
+        </Backdrop>
       </Box>
     </Box>
   );

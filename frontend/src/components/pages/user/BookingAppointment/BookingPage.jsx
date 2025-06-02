@@ -106,7 +106,7 @@ const BookingPage = () => {
     if (
       isAuthenticated &&
       currentMembership?.success &&
-      !currentMembership?.membership?.cancelled
+      new Date(currentMembership?.membership?.expiryDate) > new Date()
     ) {
       const plan = currentMembership.membership.plan;
 
@@ -210,7 +210,7 @@ const BookingPage = () => {
                 color="text.primary"
                 fontWeight="bold"
               >
-                {service?.singleServiceData?.address}
+                {service?.address}
               </Typography>
             </Box>
           </>

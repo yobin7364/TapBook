@@ -5,6 +5,7 @@ import {
   getServiceById,
   updateServiceById,
   getAvailableSlotsByDate,
+  getMyService,
 } from "../action/admin/serviceSettingAction";
 
 import { getSerivesList } from "../action/customer/servicesListAction";
@@ -34,6 +35,11 @@ const initialState = {
   availableSlots: [],
   loadingAvailableSlots: false,
   errorAvailableSlots: null,
+
+  // Get My Service
+  myService: {},
+  loadingMyService: false,
+  errorMyService: null,
 };
 
 const serviceSlice = createSlice({
