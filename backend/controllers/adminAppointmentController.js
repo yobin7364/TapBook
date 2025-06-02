@@ -127,7 +127,7 @@ export const exportBookings = async (req, res) => {
       if (from) match.createdAt.$gte = new Date(from)
       if (to)   match.createdAt.$lte = new Date(`${to}T23:59:59.999Z`)
     }
-    if (status)  match.status  = status
+    if (status && status !== 'all'){  match.status  = status}
     if (service) match.service = new mongoose.Types.ObjectId(service)
 
     // 2) initial pipeline
