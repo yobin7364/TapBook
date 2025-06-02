@@ -1,17 +1,23 @@
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
-  Checkbox,
-  FormControlLabel,
-  Grid,
-  MenuItem,
-  Paper,
-  Select,
   TextField,
   Typography,
+  Select,
+  MenuItem,
+  Grid,
+  Checkbox,
+  FormControlLabel,
+  CircularProgress,
 } from "@mui/material";
-import { TimePicker } from "@mui/x-date-pickers/TimePicker";
-import React, { useState } from "react";
+import { TimePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import dayjs from "dayjs";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+
+import { useSelector, useDispatch } from "react-redux";
+import { addService } from "../../../../action/admin/serviceSettingAction";
+import { useNavigate } from "react-router-dom";
 
 const daysOfWeek = [
   "Monday",
@@ -24,183 +30,216 @@ const daysOfWeek = [
 ];
 
 const defaultHours = daysOfWeek.reduce((acc, day) => {
-  acc[day] = { from: null, to: null, closed: false };
+  acc[day] = {
+    from: dayjs("2023-01-01T09:00:00"),
+    to: dayjs("2023-01-01T17:00:00"),
+    closed: false,
+  };
   return acc;
 }, {});
 
-const isValidPrice = (value) => /^\d*\.?\d*$/.test(value);
-
-const AddServiceForm = ({ onCancel, onSave }) => {
-  const [name, setName] = useState("");
+const AddServiceForm = () => {
+  const [serviceName, setServiceName] = useState("");
   const [category, setCategory] = useState("");
   const [duration, setDuration] = useState("");
   const [address, setAddress] = useState("");
   const [price, setPrice] = useState("");
-  const [tempHours, setTempHours] = useState(defaultHours);
+  const [businessHours, setBusinessHours] = useState(defaultHours);
+  const navigate = useNavigate();
+
+  const dispatch = useDispatch();
+
+  const { addedService, loadingAddService } = useSelector(
+    (state) => state.service
+  );
+
+  useEffect(() => {
+    if (addedService?.success) {
+      navigate("/serviceSetting");
+    }
+  }, [addedService, navigate]);
 
   const toggleClosed = (day) => {
-    setTempHours({
-      ...tempHours,
-      [day]: { ...tempHours[day], closed: !tempHours[day].closed },
-    });
+    setBusinessHours((prev) => ({
+      ...prev,
+      [day]: { ...prev[day], closed: !prev[day].closed },
+    }));
   };
 
-  const hasInvalidTimes = () =>
-    daysOfWeek.some(
-      (day) =>
-        !tempHours[day].closed &&
-        (!tempHours[day].from ||
-          !tempHours[day].to ||
-          tempHours[day].from >= tempHours[day].to)
-    );
+  const isFormValid =
+    serviceName.trim() !== "" &&
+    category.trim() !== "" &&
+    duration !== "" &&
+    address.trim() !== "" &&
+    price !== "" &&
+    !isNaN(Number(price)) &&
+    Object.values(businessHours).every((day) => {
+      if (day.closed) return true;
+      return day.from && day.to;
+    });
 
-  const handleSave = () => {
-    const formData = {
-      name,
+  const formatTime = (time) => dayjs(time).format("HH:mm:ss");
+
+  const handleSubmit = async () => {
+    const finalPayload = {
+      serviceName: serviceName.trim(),
       category,
-      duration,
-      address,
-      price,
-      hours: tempHours,
+      price: Number(price),
+      duration: Number(duration),
+      address: address.trim(),
+      businessHours: {},
     };
 
-    if (onSave) {
-      onSave(formData);
-    }
+    daysOfWeek.forEach((day) => {
+      finalPayload.businessHours[day] = {
+        from: businessHours[day].closed
+          ? "00:00:00"
+          : formatTime(businessHours[day].from),
+        to: businessHours[day].closed
+          ? "00:00:00"
+          : formatTime(businessHours[day].to),
+        closed: businessHours[day].closed,
+      };
+    });
+
+    dispatch(addService(finalPayload));
   };
 
   return (
-    <Paper sx={{ p: 4 }}>
-      <Typography variant="h6" fontWeight="bold" mb={2}>
-        Add New Service
-      </Typography>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box p={3}>
+        <Typography variant="h5" fontWeight="bold" mb={3}>
+          Add New Service
+        </Typography>
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={3}>
-          <Typography fontWeight="bold">Name *</Typography>
-          <TextField
-            fullWidth
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={3}>
+            <Typography fontWeight="bold">Service Name *</Typography>
+            <TextField
+              fullWidth
+              required
+              value={serviceName}
+              onChange={(e) => setServiceName(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Typography fontWeight="bold">Category *</Typography>
+            <Select
+              fullWidth
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                Select Category
+              </MenuItem>
+              <MenuItem value="haircut">Haircut</MenuItem>
+              <MenuItem value="massage">Massage</MenuItem>
+              <MenuItem value="yoga">Yoga</MenuItem>
+              <MenuItem value="dentist">Dentist</MenuItem>
+              <MenuItem value="gym">Gym</MenuItem>
+              <MenuItem value="consultation">Consultation</MenuItem>
+            </Select>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Typography fontWeight="bold">Duration (minutes) *</Typography>
+            <Select
+              fullWidth
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              displayEmpty
+            >
+              <MenuItem value="" disabled>
+                Select Duration
+              </MenuItem>
+              <MenuItem value={15}>15 minutes</MenuItem>
+              <MenuItem value={30}>30 minutes</MenuItem>
+              <MenuItem value={60}>1 hour</MenuItem>
+            </Select>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Typography fontWeight="bold">Address *</Typography>
+            <TextField
+              fullWidth
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Typography fontWeight="bold">Price ($) *</Typography>
+            <TextField
+              fullWidth
+              value={price}
+              onChange={(e) => {
+                if (/^\d*\.?\d*$/.test(e.target.value)) {
+                  setPrice(e.target.value);
+                }
+              }}
+              inputProps={{ inputMode: "decimal", pattern: "\\d*" }}
+            />
+          </Grid>
         </Grid>
 
-        <Grid item xs={12} sm={3}>
-          <Typography fontWeight="bold">Category</Typography>
-          <Select
-            fullWidth
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            displayEmpty
-          >
-            <MenuItem value="">Select Category</MenuItem>
-            <MenuItem value="haircut">Haircut</MenuItem>
-            <MenuItem value="massage">Massage</MenuItem>
-            <MenuItem value="yoga">Yoga</MenuItem>
-            <MenuItem value="dentist">Dentist</MenuItem>
-            <MenuItem value="gym">Gym</MenuItem>
-            <MenuItem value="consultation">Consultation</MenuItem>
-          </Select>
-        </Grid>
-
-        <Grid item xs={12} sm={3}>
-          <Typography fontWeight="bold">Appointment Duration</Typography>
-          <Select
-            fullWidth
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            displayEmpty
-          >
-            <MenuItem value="">Select Duration</MenuItem>
-            <MenuItem value="15 minutes">15 minutes</MenuItem>
-            <MenuItem value="30 minutes">30 minutes</MenuItem>
-            <MenuItem value="1 hour">1 hour</MenuItem>
-          </Select>
-        </Grid>
-
-        <Grid item xs={12} sm={3}>
-          <Typography fontWeight="bold">Address</Typography>
-          <TextField
-            fullWidth
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-          />
-        </Grid>
-
-        <Grid item xs={12} sm={3}>
-          <Typography fontWeight="bold">Price ($)</Typography>
-          <TextField
-            fullWidth
-            value={price}
-            onChange={(e) => {
-              if (isValidPrice(e.target.value)) {
-                setPrice(e.target.value);
+        <Typography mt={4} mb={1} fontWeight="bold">
+          Business Hours *
+        </Typography>
+        {daysOfWeek.map((day) => (
+          <Box key={day} mb={2} display="flex" alignItems="center" gap={2}>
+            <Typography sx={{ width: 100 }} fontWeight="bold">
+              {day}
+            </Typography>
+            <TimePicker
+              label="From"
+              value={businessHours[day].from}
+              onChange={(newVal) =>
+                setBusinessHours((prev) => ({
+                  ...prev,
+                  [day]: { ...prev[day], from: newVal },
+                }))
               }
-            }}
-            inputProps={{ inputMode: "decimal", pattern: "\\d*" }}
-          />
-        </Grid>
-      </Grid>
+              disabled={businessHours[day].closed}
+              minutesStep={5}
+            />
+            <TimePicker
+              label="To"
+              value={businessHours[day].to}
+              onChange={(newVal) =>
+                setBusinessHours((prev) => ({
+                  ...prev,
+                  [day]: { ...prev[day], to: newVal },
+                }))
+              }
+              disabled={businessHours[day].closed}
+              minutesStep={5}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={businessHours[day].closed}
+                  onChange={() => toggleClosed(day)}
+                />
+              }
+              label="Closed"
+            />
+          </Box>
+        ))}
 
-      <Typography mt={4} mb={1} fontWeight="bold">
-        Business Hours
-      </Typography>
-      {daysOfWeek.map((day) => (
-        <Box key={day} mb={2} display="flex" alignItems="center" gap={2}>
-          <Typography sx={{ width: 100 }} fontWeight="bold">
-            {day}
-          </Typography>
-          <TimePicker
-            label="From"
-            value={tempHours[day].from}
-            onChange={(newVal) =>
-              setTempHours({
-                ...tempHours,
-                [day]: { ...tempHours[day], from: newVal },
-              })
+        <Box mt={3}>
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={!isFormValid || loadingAddService}
+            startIcon={
+              loadingAddService ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : null
             }
-            disabled={tempHours[day].closed}
-            minutesStep={5}
-          />
-          <TimePicker
-            label="To"
-            value={tempHours[day].to}
-            onChange={(newVal) =>
-              setTempHours({
-                ...tempHours,
-                [day]: { ...tempHours[day], to: newVal },
-              })
-            }
-            disabled={tempHours[day].closed}
-            minTime={tempHours[day].from}
-            minutesStep={5}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={tempHours[day].closed}
-                onChange={() => toggleClosed(day)}
-              />
-            }
-            label="Closed"
-          />
+          >
+            {loadingAddService ? "Submitting..." : "Submit Service"}
+          </Button>
         </Box>
-      ))}
-
-      <Box mt={3}>
-        <Button variant="outlined" sx={{ mr: 2 }} onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          variant="contained"
-          onClick={handleSave}
-          disabled={!name || !price || Number(price) < 0 || hasInvalidTimes()}
-        >
-          Save
-        </Button>
       </Box>
-    </Paper>
+    </LocalizationProvider>
   );
 };
 

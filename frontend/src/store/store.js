@@ -5,6 +5,7 @@ import serviceReducer from "../redux/serviceSlice";
 import manageAppointmentReducer from "../redux/manageAppointmentSlice";
 import membershipReducer from "../redux/membershipSlice";
 import userAppointmentReducer from "../redux/appointmentSlice";
+import providerReviewsReducer from "../redux/reviewSlice";
 
 const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ const store = configureStore({
     manageAppointment: manageAppointmentReducer,
     membership: membershipReducer,
     userAppointment: userAppointmentReducer,
+    providerReviews: providerReviewsReducer,
   },
 });
 

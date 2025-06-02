@@ -5,9 +5,9 @@ import axios from "axios";
 // Add New Service
 export const addService = createAsyncThunk(
   "admin/post/service",
-  async (serviceData, { rejectWithValue }) => {
+  async (finalPayload, { rejectWithValue }) => {
     try {
-      const { data } = await axios.post("/api/admin/services", serviceData);
+      const { data } = await axios.post("/api/admin/services", finalPayload);
       return data;
     } catch (error) {
       return rejectWithValue(

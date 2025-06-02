@@ -17,7 +17,11 @@ import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import CommonToast from "../../../common/CommonToast";
 import { useSelector, useDispatch } from "react-redux";
-import { getMyService } from "../../../../action/admin/serviceSettingAction";
+import {
+  getMyService,
+  updateServiceById,
+} from "../../../../action/admin/serviceSettingAction";
+import { useNavigate } from "react-router-dom";
 
 const daysOfWeek = [
   "Monday",
@@ -49,6 +53,7 @@ const ServiceSettingsPage = () => {
   const [tempHours, setTempHours] = useState(defaultHours);
   const [toastOpen, setToastOpen] = useState(false);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const { myService, loadingMyService } = useSelector((state) => state.service);
 
@@ -56,51 +61,93 @@ const ServiceSettingsPage = () => {
     dispatch(getMyService());
   }, [dispatch]);
 
+  const parseBusinessHours = (rawHours) => {
+    const parsed = {};
+    for (const day in rawHours) {
+      const { from, to, closed } = rawHours[day];
+
+      parsed[day] = {
+        from: new Date(`1970-01-01T${from}`),
+        to: new Date(`1970-01-01T${to}`),
+        closed: closed || false,
+      };
+    }
+    return parsed;
+  };
+
   useEffect(() => {
     if (myService?.service) {
-      const { name, category, duration, address, price } = myService.service;
-      setName(name || "");
+      const { serviceName, category, duration, address, price, businessHours } =
+        myService.service;
+      setName(serviceName || "");
       setCategory(category || "");
       setDuration(duration || "");
       setAddress(address || "");
       setPrice(price?.toString() || "");
-      // Optional: Load business hours from backend if available
-    } else {
-      setName("");
-      setCategory("");
-      setDuration("");
-      setAddress("");
-      setPrice("");
-      setBusinessHours(defaultHours);
-      setTempHours(defaultHours);
+
+      if (businessHours) {
+        const parsedHours = parseBusinessHours(businessHours);
+        setBusinessHours(parsedHours);
+        setTempHours(parsedHours); // Pre-fill edit form
+      }
     }
   }, [myService]);
 
-  const isInitialEmpty =
-    !name &&
-    !category &&
-    !duration &&
-    !address &&
-    (!price || Number(price) <= 0);
-
-  const hasInvalidTimes = () => {
-    return daysOfWeek.some((day) => {
-      const { from, to, closed } = tempHours[day];
-      return !closed && from >= to;
+  const isFormValid =
+    name.trim() !== "" &&
+    category.trim() !== "" &&
+    duration !== "" &&
+    address.trim() !== "" &&
+    price !== "" &&
+    !isNaN(Number(price)) &&
+    Object.values(businessHours).every((day) => {
+      if (day.closed) return true;
+      return day.from && day.to;
     });
-  };
 
   const isValidPrice = (value) => {
     return /^\d*\.?\d*$/.test(value);
   };
 
   const handleSave = () => {
-    if (!name || hasInvalidTimes() || !isValidPrice(price)) return;
+    // if (!name || hasInvalidTimes() || !isValidPrice(price)) return;
+
+    const formatTime = (date) =>
+      new Date(date).toLocaleTimeString("en-GB", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+    const businessHours = {};
+    Object.entries(tempHours).forEach(([day, { from, to, closed }]) => {
+      businessHours[day] = {
+        from: formatTime(from),
+        to: formatTime(to),
+        closed,
+      };
+    });
+
+    const serviceData = {
+      serviceName: name,
+      category: category,
+      price: Number(price),
+      duration: Number(duration),
+      address: address,
+      businessHours,
+    };
+
+    dispatch(
+      updateServiceById({
+        serviceId: myService?.service?._id,
+        updatedData: serviceData,
+      })
+    ).then(() => dispatch(getMyService()));
+
     setBusinessHours(tempHours);
     setIsEditMode(false);
     setToastOpen(true);
-
-    // TODO: Dispatch save action here
   };
 
   const toggleClosed = (day) => {
@@ -140,13 +187,7 @@ const ServiceSettingsPage = () => {
                   <Button
                     variant="contained"
                     onClick={() => {
-                      setIsEditMode(true);
-                      setName("");
-                      setCategory("");
-                      setDuration("");
-                      setAddress("");
-                      setPrice("");
-                      setTempHours(defaultHours);
+                      navigate("/addServiceForm");
                     }}
                   >
                     Add Service
@@ -160,7 +201,7 @@ const ServiceSettingsPage = () => {
                       <strong>Category:</strong> {category}
                     </Typography>
                     <Typography>
-                      <strong>Appointment Duration:</strong> {duration}
+                      <strong>Appointment Duration:</strong> {duration} minutes
                     </Typography>
                     <Typography>
                       <strong>Address:</strong> {address}
@@ -242,9 +283,9 @@ const ServiceSettingsPage = () => {
                       value={duration}
                       onChange={(e) => setDuration(e.target.value)}
                     >
-                      <MenuItem value="15 minutes">15 minutes</MenuItem>
-                      <MenuItem value="30 minutes">30 minutes</MenuItem>
-                      <MenuItem value="1 hour">1 hour</MenuItem>
+                      <MenuItem value="15">15 minutes</MenuItem>
+                      <MenuItem value="30">30 minutes</MenuItem>
+                      <MenuItem value="60">1 hour</MenuItem>
                     </Select>
                   </Grid>
                   <Grid item xs={12} sm={3}>
@@ -325,16 +366,17 @@ const ServiceSettingsPage = () => {
                   <Button
                     variant="outlined"
                     sx={{ mr: 2 }}
-                    onClick={() => setIsEditMode(false)}
+                    onClick={() => {
+                      setTempHours(businessHours); // Reset form
+                      setIsEditMode(false);
+                    }}
                   >
                     Cancel
                   </Button>
                   <Button
                     variant="contained"
+                    disabled={!isFormValid}
                     onClick={handleSave}
-                    disabled={
-                      !name || hasInvalidTimes() || !price || Number(price) < 0
-                    }
                   >
                     Save
                   </Button>
@@ -342,13 +384,14 @@ const ServiceSettingsPage = () => {
               </Box>
             )}
           </Box>
-
-          <CommonToast
-            open={toastOpen}
-            onClose={() => setToastOpen(false)}
-            message="Service settings updated successfully!"
-          />
         </Paper>
+
+        <CommonToast
+          open={toastOpen}
+          onClose={() => setToastOpen(false)}
+          severity="success"
+          message="Service details updated successfully!"
+        />
       </Box>
     </LocalizationProvider>
   );
