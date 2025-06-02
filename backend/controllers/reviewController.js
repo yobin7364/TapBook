@@ -2,7 +2,7 @@ import Review from '../models/Review.module.js'
 import Appointment from '../models/Appointment.module.js'
 import { validateReview } from '../validator/review.validator.js'
 import Service from '../models/Service.module.js'
-
+import mongoose from 'mongoose'
 
 // @route   POST /api/reviews
 // @desc    Create a review for a completed appointment
@@ -57,23 +57,67 @@ if (appt.status !== 'completed') {
     console.error('Create review error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
-}// @route   GET /api/reviews/user/:id
-// @desc    Get all reviews for a given user (paginated)
-// @access  Public
-export const getReviewsForUser = async (req, res) => {
-  const page = parseInt(req.query.page) || 1
-  const limit = parseInt(req.query.limit) || 10
-  const skip = (page - 1) * limit
+}// @route   GET /api/reviews/mine
+// @desc    Admin sees all reviews made by users on themselves (paginated)
+// @access  Private (admin only)
+export const getMyUserReviews = async (req, res) => {
+  const page  = Math.max(parseInt(req.query.page)  || 1,  1)
+  const limit = Math.max(parseInt(req.query.limit) || 10, 1)
+  const skip  = (page - 1) * limit
 
   try {
-    // Find reviews for the provider
-    const [reviews, total] = await Promise.all([
-      Review.find({ reviewee: req.params.id })
-        .populate('reviewer', 'name email')
-        .sort({ createdAt: -1 }) // newest first
-        .skip(skip)
-        .limit(limit),
-      Review.countDocuments({ reviewee: req.params.id }),
+    const myId = req.user.id
+
+    if (!mongoose.Types.ObjectId.isValid(myId)) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' })
+    }
+
+    // 1) Count only those reviews where reviewee = me AND reviewer.role = "user"
+    //    We’ll do a two‐stage aggregation: first match reviewee, then lookup reviewer to filter by role.
+    const countAgg = await Review.aggregate([
+      { $match: { reviewee: new mongoose.Types.ObjectId(myId) } },
+      {
+        $lookup: {
+          from:        'users',
+          localField:  'reviewer',
+          foreignField:'_id',
+          as:          'revUser'
+        }
+      },
+      { $unwind: '$revUser' },
+      { $match: { 'revUser.role': 'user' } },
+      { $count: 'total' }
+    ])
+    const total = countAgg[0]?.total || 0
+
+    // 2) Fetch one page of those same reviews, again joined with reviewer’s name/email
+    const reviews = await Review.aggregate([
+      { $match: { reviewee: new mongoose.Types.ObjectId(myId) } },
+      {
+        $lookup: {
+          from:        'users',
+          localField:  'reviewer',
+          foreignField:'_id',
+          as:          'revUser'
+        }
+      },
+      { $unwind: '$revUser' },
+      { $match: { 'revUser.role': 'user' } },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $project: {
+          _id:         1,
+          appointment: 1,
+          rating:      1,
+          comment:     1,
+          createdAt:   1,
+          'reviewer._id':   '$revUser._id',
+          'reviewer.name':  '$revUser.name',
+          'reviewer.email': '$revUser.email'
+        }
+      }
     ])
 
     return res.json({
@@ -83,14 +127,14 @@ export const getReviewsForUser = async (req, res) => {
         total,
         page,
         pages: Math.ceil(total / limit),
-      },
+        limit
+      }
     })
   } catch (err) {
-    console.error('Get reviews error:', err)
+    console.error('Get my user‐made reviews error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
-
 // @route   PUT /api/reviews/:id
 // @desc    Edit a review (customer only)
 // @access  Private (user)
@@ -158,7 +202,7 @@ export const createCustomerReview = async (req, res) => {
 
 
     // 4) Prevent duplicate
-    if (await Review.findOne({ appointment })) {
+    if (await Review.findOne({ appointment, reviewer: req.user.id })) {
       return res.status(400).json({ success: false, error: 'Review already exists for this appointment' })
     }
 
