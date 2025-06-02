@@ -3,10 +3,9 @@ import Service from '../models/Service.module.js'
 import { validateAppointment } from '../validator/appointment.validator.js'
 import User from '../models/User.module.js'
 import { getAppointmentSummaryData } from '../utils/appointment.utils.js'
-import { sendEmail } from '../utils/mailer.js' // or wherever your mailer is
+import { sendEmail } from '../utils/mailer.js' 
 import Review from '../models/Review.module.js'
-
-import NotificationModule from '../models/Notification.module.js'
+import Notification from '../models/Notification.module.js'
 
 
 // @route   POST /api/appointments
@@ -16,7 +15,7 @@ export const bookAppointment = async (req, res) => {
   const {name, service, start, mobile, note } = req.body
 
 
-  // 1) Parse dates
+  // Parse dates
   const startDate = new Date(start)
   const now       = new Date()
   if (isNaN(startDate)) {
@@ -33,21 +32,23 @@ export const bookAppointment = async (req, res) => {
   }
 
   try {
-    // 2) Load service to get its duration
+    // Load service to get its duration
     const svc = await Service.findById(service)
     if (!svc) {
-      return res.status(404).json({ success: false, error: 'Service not found' })
+      return res
+        .status(404)
+        .json({ success: false, error: 'Service not found' })
     }
 
-    // 3) Compute end using the service’s duration (in minutes)
+    // Compute end using the service’s duration (in minutes)
     const endDate = new Date(startDate.getTime() + svc.duration * 60000)
-    const slot    = { start: startDate, end: endDate }
+    const slot = { start: startDate, end: endDate }
 
-    // 4) DRY: business hours + cost summary
+    // business hours + cost summary
     const { summary, error } = await getAppointmentSummaryData({
-      userId:    req.user.id,
+      userId: req.user.id,
       serviceId: service,
-      slot
+      slot,
     })
     if (error) {
       return res.status(400).json({ success: false, error })
@@ -55,85 +56,95 @@ export const bookAppointment = async (req, res) => {
 
     const { serviceCost, membershipDiscount, totalDue } = summary
 
-    // 5) Prevent double-booking the same provider
+    // Prevent double-booking the same provider
     const conflict = await Appointment.findOne({
       service,
-      status: { $in: ['pending','confirmed'] },
+      status: { $in: ['pending', 'confirmed'] },
       'slot.start': { $lt: endDate },
-      'slot.end':   { $gt: startDate }
+      'slot.end': { $gt: startDate },
     })
     if (conflict) {
       return res.status(400).json({
         success: false,
-        error: 'This time slot is already booked'
+        error: 'This time slot is already booked',
       })
     }
 
-    // 6) Prevent user from double-booking themselves
+    // Prevent user from double-booking themselves
     const selfConflict = await Appointment.findOne({
       customer: req.user.id,
-      status:   { $in: ['pending','confirmed'] },
+      status: { $in: ['pending', 'confirmed'] },
       'slot.start': { $lt: endDate },
-      'slot.end':   { $gt: startDate }
+      'slot.end': { $gt: startDate },
     })
     if (selfConflict) {
       return res.status(400).json({
         success: false,
-        error: 'You already have a booking in that time slot'
+        error: 'You already have a booking in that time slot',
       })
     }
-  // 7) Compute average service rating
+    // Compute average service rating
     const stats = await Review.aggregate([
       { $match: { service: svc._id } },
-      { $group: { _id: null, avgRating: { $avg: '$rating' } } }
+      { $group: { _id: null, avgRating: { $avg: '$rating' } } },
     ])
     const avgRating = stats[0]?.avgRating ?? 0
 
-    // 8) Fetch admin name
+    // Fetch admin name
     const adminUser = await User.findById(svc.admin).select('name').lean()
     const adminName = adminUser?.name || 'Unknown'
-    // 7) Save the appointment, embedding payment breakdown
+    // Save the appointment, embedding payment breakdown
     const appointment = new Appointment({
-      customer:    req.user.id,
+      customer: req.user.id,
       customerName: name,
       service,
       slot,
       scheduledAt: startDate,
       mobile,
-      note:        note || '',
-      status:      'pending',
+      note: note || '',
+      status: 'pending',
       payment: {
         serviceCost,
         membershipDiscount,
-        totalDue
-      }
+        totalDue,
+      },
     })
     await appointment.save()
-
-    // 8) Return everything in one go
+    // Create notification
+    await Notification.create({
+      user: req.user.id,
+      type: 'status', 
+      message: `Your appointment for "${
+        svc.serviceName || svc.category
+      }" is now pending.`,
+      appointment: appointment._id,
+      read: false,
+      createdAt: new Date(),
+    })
+    //Return everything in one go
     return res.status(201).json({
-      success:            true,
+      success: true,
       appointment,
-      serviceCost,        // e.g. 120
+      serviceCost, // e.g. 120
       membershipDiscount, //   e.g. 6
-      totalDue  ,          //   e.g.114
+      totalDue, //   e.g.114
       serviceAddress: svc.address,
       avgRating,
-      adminName
+      adminName,
     })
-
   } catch (err) {
     console.error('Book appointment error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
 // @route   PUT /api/appointments/:id
 // @desc    Edit an existing appointment (user)
 // @access  Private (user)
 export const updateAppointment = async (req, res) => {
   const { name, start, mobile, note } = req.body
 
-  // 0) Require at least one field to update
+  // Require at least one field to update
   if (!name && !start && !mobile && !note) {
     return res.status(400).json({
       success: false,
@@ -142,13 +153,13 @@ export const updateAppointment = async (req, res) => {
   }
 
   try {
-    // 1) Load appointment and ensure it's this user's
+    // Load appointment and ensure it's this user's
     const appt = await Appointment.findById(req.params.id)
     if (!appt || appt.customer.toString() !== req.user.id) {
       return res.status(404).json({ success: false, error: 'Appointment not found' })
     }
 
-    // 2) Only allow editing if still pending or confirmed
+    // Only allow editing if still pending or confirmed
     if (!['pending','confirmed'].includes(appt.status)) {
       return res.status(400).json({
         success: false,
@@ -156,12 +167,13 @@ export const updateAppointment = async (req, res) => {
       })
     }
 
-    let slot = appt.slot
-    let serviceCost = appt.payment.serviceCost
+    let slot               = appt.slot
+    let serviceCost        = appt.payment.serviceCost
     let membershipDiscount = appt.payment.membershipDiscount
-    let totalDue = appt.payment.totalDue
+    let totalDue           = appt.payment.totalDue
+    let svc                // will be assigned if start changes
 
-    // 3) If start is changing, re‐validate slot & recalc payment
+    //If start is changing, re‐validate slot & recalc payment
     if (start) {
       const startDate = new Date(start)
       if (isNaN(startDate)) {
@@ -173,7 +185,7 @@ export const updateAppointment = async (req, res) => {
       }
 
       // load service to get duration
-      const svc = await Service.findById(appt.service)
+      svc = await Service.findById(appt.service)
       if (!svc) {
         return res.status(404).json({ success: false, error: 'Service not found' })
       }
@@ -183,20 +195,20 @@ export const updateAppointment = async (req, res) => {
 
       // business‐hours & cost summary
       const { summary, error } = await getAppointmentSummaryData({
-        userId: req.user.id,
+        userId:    req.user.id,
         serviceId: svc._id.toString(),
-        slot: newSlot
+        slot:      newSlot
       })
       if (error) {
         return res.status(400).json({ success: false, error })
       }
 
       ({ serviceCost, membershipDiscount, totalDue } = summary)
-      slot = newSlot
+      slot             = newSlot
       appt.scheduledAt = startDate
     }
 
-    // 4) Prevent double‐booking same provider
+    // Prevent double‐booking same provider (only if start changed)
     if (start) {
       const conflict = await Appointment.findOne({
         _id: { $ne: appt._id },
@@ -211,7 +223,7 @@ export const updateAppointment = async (req, res) => {
       const selfConflict = await Appointment.findOne({
         _id: { $ne: appt._id },
         customer: req.user.id,
-        status: { $in: ['pending','confirmed'] },
+        status:   { $in: ['pending','confirmed'] },
         'slot.start': { $lt: slot.end },
         'slot.end':   { $gt: slot.start }
       })
@@ -220,37 +232,51 @@ export const updateAppointment = async (req, res) => {
       }
     }
 
-    // 5) Apply other updates
+    // Apply other updates
     if (name)   appt.customerName = name
     if (mobile) appt.mobile       = mobile
     if (note)   appt.note         = note
     if (start)  appt.slot         = slot
 
-    // 6) Update payment if slot changed
+    // Update payment if slot changed
     if (start) {
       appt.payment = { serviceCost, membershipDiscount, totalDue }
     }
 
+    // Save the appointment
     await appt.save()
 
-    // 7) Fetch updated avgRating, adminName, address for response
-    const svc = await Service.findById(appt.service)
+    // If start was changed, create a “rescheduled” notification
+    if (start && svc) {
+      const serviceName = svc.serviceName || svc.category || 'your service'
+      await Notification.create({
+        user:        req.user.id,
+        type:        'status',  // or 'reschedule' if you prefer
+        message:     `Your appointment for "${serviceName}" was rescheduled.`,
+        appointment: appt._id,
+        read:        false,
+        createdAt:   new Date()
+      })
+    }
+
+    // Fetch updated avgRating, adminName, address for response
+    const svcForReturn = svc ?? (await Service.findById(appt.service))
     const stats = await Review.aggregate([
-      { $match: { service: svc._id } },
+      { $match: { service: svcForReturn._id } },
       { $group: { _id: null, avgRating: { $avg: '$rating' } } }
     ])
     const avgRating = stats[0]?.avgRating ?? 0
-    const adminUser = await User.findById(svc.admin).select('name').lean()
+    const adminUser = await User.findById(svcForReturn.admin).select('name').lean()
     const adminName = adminUser?.name || 'Unknown'
 
-    // 8) Return updated appointment + related info
+    // Return updated appointment + related info
     return res.json({
-      success:            true,
-      appointment:        appt,
+      success:        true,
+      appointment:    appt,
       serviceCost,
       membershipDiscount,
       totalDue,
-      serviceAddress:     svc.address,
+      serviceAddress: svcForReturn.address,
       avgRating,
       adminName
     })
@@ -259,6 +285,7 @@ export const updateAppointment = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
 // @route   GET /api/appointments/past
 // @desc    List all past appointments (slot.end < now) for the user
 // @access  Private (user)
@@ -499,6 +526,7 @@ if (appt.status !== 'pending' && appt.status !== 'confirmed') {
     }
     await appt.save()
 
+
 // record an in-app notification
 await Notification.create({
    user:        appt.customer._id,
@@ -529,11 +557,9 @@ If you have questions, please contact support.`,
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
-// controllers/notification.controller.js
-import Notification from '../models/Notification.module.js'
 
 // @route   GET /api/notifications
-// @desc    List user notifications (status‐change, reminders, etc.), paginated
+// @desc    List user notifications 
 // @access  Private (user)
 export const getNotifications = async (req, res) => {
   const page  = Math.max(parseInt(req.query.page)  || 1, 1)
@@ -541,22 +567,19 @@ export const getNotifications = async (req, res) => {
   const skip  = (page - 1) * limit
 
   try {
-    // 1) total count
     const total = await Notification.countDocuments({ user: req.user.id })
 
-    // 2) fetch page
     const notes = await Notification.find({ user: req.user.id })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean()
 
-    // 3) shape for front‐end
     const notifications = notes.map(n => ({
       id:          n._id,
       type:        n.type,            // 'status' or 'reminder'
       message:     n.message,
-      appointment: n.appointment,     // optional appointment _id
+      appointment: n.appointment,     
       read:        n.read,
       date:        n.createdAt
     }))
@@ -579,7 +602,7 @@ export const getNotifications = async (req, res) => {
 
 
 // @route   PUT /api/appointments/:id/cancel
-// @desc    Cancel appointment (user), with cancelNote required
+// @desc    Cancel appointment by user with cancelNote required
 // @access  Private (user)
 export const cancelAppointment = async (req, res) => {
   const { cancelNote } = req.body;

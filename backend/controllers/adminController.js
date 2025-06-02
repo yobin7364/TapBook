@@ -6,27 +6,24 @@ import Review from '../models/Review.module.js'
 
 export const getStats = async (req, res) => {
   try {
-    // 1. Basic counts
     const [bookingCount, userCount, serviceCount] = await Promise.all([
       Appointment.countDocuments(),
       User.countDocuments(),
-      // import and count your Service model if you want this
     ])
 
-    // 2. Active users (users with at least one booking)
+    //Active users (users with at least one booking)
     const activeUsers = await Appointment.distinct('customer')
     const activeUserCount = activeUsers.length
 
-    // 3. Total Revenue (sum totalDue if present, else fallback to service.price)
+    //Total Revenue
     const completedBookings = await Appointment.find({
       status: { $in: ['confirmed', 'completed'] },
     }).populate('service')
     const totalRevenue = completedBookings.reduce((sum, appt) => {
-      // If you store totalDue in appointment, otherwise use service.price
       return sum + (appt.summary?.totalDue || appt.service?.price || 0)
     }, 0)
 
-    // 4. Bookings by week (for the past 7 days, grouped by weekday)
+    // Bookings by week (for the past 7 days, grouped by weekday)
     const startOfWeek = (() => {
       const d = new Date()
       d.setHours(0, 0, 0, 0)
@@ -45,7 +42,7 @@ export const getStats = async (req, res) => {
       bookingsByWeek[day]++
     })
 
-    // 5. Booking status counts (confirmed, completed, cancelled)
+    //Booking status counts (confirmed, completed, cancelled)
     const statuses = [
       'confirmed',
       'completed',
@@ -80,7 +77,7 @@ export const getStats = async (req, res) => {
             : '',
           status: appt.status,
           rating: review ? review.rating : '-', // show rating if review found
-          reviewDescription: review ? review.comment : '-', // NEW: show review comment if exists
+          reviewDescription: review ? review.comment : '-', //  show review comment if exists
         }
       })
     )

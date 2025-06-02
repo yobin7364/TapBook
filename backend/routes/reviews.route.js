@@ -3,8 +3,9 @@ import passport from 'passport'
 import { authorizeRoles } from '../middleware/roleCheck.js'
 import {
   createReview,
-  getReviewsForUser,
-  updateReview
+  updateReview,
+  getMyUserReviews,
+  listCustomerReviews
 } from '../controllers/reviewController.js'
 
 const router = express.Router()
@@ -17,10 +18,14 @@ router.use(passport.authenticate('jwt', { session: false }))
 // @access  Private (user)
 router.post('/', authorizeRoles('user'), createReview)
 
-// @route   GET /api/reviews/user/:id
-// @desc    View reviews about a user
-// @access  Public
-router.get('/user/:id', getReviewsForUser)
+// Only admins/providers can hit this; passportAuth ensures req.user is set
+router.get(
+  '/mine',
+  passport.authenticate('jwt', { session: false }),
+  getMyUserReviews
+)
+
+router.get('/admin', passport.authenticate('jwt', { session: false }), listCustomerReviews)
 // @route   PUT /api/reviews/:id
 // @desc    Edit your own review
 // @access  Private (user)
