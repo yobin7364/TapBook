@@ -8,7 +8,6 @@ import UserNavbar from "./components/common/userNavBar";
 import UserFooter from "./components/common/UserFooter";
 import BookingPage from "./components/pages/user/BookingAppointment/BookingPage";
 import MyAppointments from "./components/pages/user/MyAppointments/MyAppointments";
-import UpdateAppointment from "./components/pages/user/MyAppointments/UpdateAppointment";
 import Membership from "./components/pages/user/Membership/Membership";
 import Notifications from "./components/pages/user/Notification/Notifications";
 import ProfilePage from "./components/pages/user/profile/ProfilePage";
@@ -74,7 +73,7 @@ function App() {
         ) : (
           <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
             <Route path="/myAppointments" element={<MyAppointments />} />
-            <Route path="/updateAppointment" element={<UpdateAppointment />} />
+
             <Route path="/myMembership" element={<Membership />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profilePage" element={<ProfilePage />} />

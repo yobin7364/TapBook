@@ -16,3 +16,17 @@ export const getSerivesList = createAsyncThunk(
     }
   }
 );
+
+export const bookAppointment = createAsyncThunk(
+  "customer/bookAppointment",
+  async (appointmentData, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.post("/api/appointments", appointmentData);
+      return data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.errors || "Failed to book appointment"
+      );
+    }
+  }
+);

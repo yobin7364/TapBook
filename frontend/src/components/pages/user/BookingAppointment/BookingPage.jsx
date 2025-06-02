@@ -6,46 +6,27 @@ import {
   Button,
   Grid,
   TextField,
-  Divider,
   CircularProgress,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { getServiceById } from "../../../../action/admin/serviceSettingAction";
-import { useParams } from "react-router-dom";
-import { useLocation } from "react-router-dom";
+import {
+  getServiceById,
+  getAvailableSlotsByDate,
+} from "../../../../action/admin/serviceSettingAction";
 import { getMembership } from "../../../../action/customer/membershipAction";
+
+import { bookAppointment } from "../../../../action/customer/servicesListAction";
+import { resetAppointmentState } from "../../../../redux/serviceSlice";
+import CommonToast from "../../../common/CommonToast";
 
 const getNext7Days = () => {
   const today = new Date();
-  const days = [];
-  for (let i = 0; i < 7; i++) {
-    const futureDate = new Date(today);
-    futureDate.setDate(today.getDate() + i);
-    days.push(futureDate);
-  }
-  return days;
-};
-
-const generateTimeSlots = () => {
-  const slots = [];
-  for (let hour = 9; hour <= 20; hour++) {
-    slots.push(`${hour}:00`);
-    slots.push(`${hour}:30`);
-  }
-  return slots;
-};
-
-// Mock booking data
-const bookingData = {
-  providerName: "Dr. Emily Carter",
-  providerSpecialization: "General Consultation",
-  address: "123 Health Street, Wellness City",
-  rating: 4.8,
-  appointmentDate: "2025-04-27",
-  appointmentTime: "15:30",
-  serviceCost: 100,
-  membershipDiscount: 20,
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    return date;
+  });
 };
 
 const BookingPage = () => {
@@ -54,53 +35,61 @@ const BookingPage = () => {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [mobile, setMobile] = useState("");
   const [name, setName] = useState("");
-  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-
-  const { service, loadingSingleService } = useSelector(
-    (state) => state.service.singleService || {}
-  );
-
-  const { currentMembership, loadingMembership } = useSelector(
-    (state) => state.membership || {}
-  );
-
-  const location = useLocation();
-  const serviceCost = location.state?.price;
-
-  const [isPaying, setIsPaying] = useState(false);
-  const [paymentDone, setPaymentDone] = useState(false);
-  const dispatch = useDispatch();
-
   const [note, setNote] = useState("");
-  const navigate = useNavigate();
-
-  const { serviceId } = useParams(); // this grabs the serviceId from the URL
-
   const [membershipDiscount, setMembershipDiscount] = useState(0);
   const [totalDue, setTotalDue] = useState(0);
 
-  const dates = getNext7Days();
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastSeverity, setToastSeverity] = useState("success");
 
-  useEffect(() => {
-    const now = new Date();
-    const todaySlots = generateTimeSlots().filter((slot) => {
-      if (selectedDate.toDateString() !== now.toDateString()) return true;
-      const [slotHour, slotMin] = slot.split(":").map(Number);
-      if (slotHour > now.getHours()) return true;
-      if (slotHour === now.getHours() && slotMin > now.getMinutes())
-        return true;
-      return false;
-    });
-    setAvailableSlots(todaySlots);
-    setSelectedTime("");
-  }, [selectedDate]);
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+  const {
+    availableSlots: slotsFromAPI,
+    loadingAvailableSlots,
+    appointment,
+    loadingAppointment,
+  } = useSelector((state) => state.service);
+  const { service, loadingSingleService } = useSelector(
+    (state) => state.service.singleService || {}
+  );
+  const { currentMembership } = useSelector((state) => state.membership || {});
+
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { serviceId } = useParams();
+  const location = useLocation();
+  const serviceCost = location.state?.price;
+
+  const dates = getNext7Days();
 
   useEffect(() => {
     dispatch(getMembership());
     if (serviceId) {
       dispatch(getServiceById({ serviceId }));
+      dispatch(
+        getAvailableSlotsByDate({
+          serviceId,
+          date: selectedDate.toLocaleDateString("en-CA"),
+        })
+      ).then((res) => {
+        const slotsWithFormattedTime = res.payload.slots.map((slot) => {
+          const utcDate = new Date(slot.start);
+          const time = utcDate.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+            timeZone: "UTC",
+          });
+          return {
+            time,
+            available: slot.available,
+          };
+        });
+        setAvailableSlots(slotsWithFormattedTime.map((s) => s.time));
+      });
     }
-  }, [dispatch, serviceId]);
+  }, [dispatch, serviceId, selectedDate]);
 
   useEffect(() => {
     if (
@@ -109,56 +98,67 @@ const BookingPage = () => {
       new Date(currentMembership?.membership?.expiryDate) > new Date()
     ) {
       const plan = currentMembership.membership.plan;
-
-      let discount = 0;
-
-      if (plan === "yearly") {
-        discount = 10; // 10% for yearly
-      } else if (plan === "monthly") {
-        discount = 5; // 5% for monthly
-      }
-
-      setMembershipDiscount(discount);
-
-      if (serviceCost) {
-        const calculatedDiscount = (serviceCost * discount) / 100;
-        const finalAmount = serviceCost - calculatedDiscount;
-
-        setMembershipDiscount(calculatedDiscount);
-        setTotalDue(finalAmount);
-      }
+      const discount = plan === "yearly" ? 10 : plan === "monthly" ? 5 : 0;
+      const calculatedDiscount = (serviceCost * discount) / 100;
+      setMembershipDiscount(calculatedDiscount);
+      setTotalDue(serviceCost - calculatedDiscount);
     } else {
-      // If not authenticated or membership inactive
       setMembershipDiscount(0);
       setTotalDue(serviceCost || 0);
     }
   }, [isAuthenticated, currentMembership, serviceCost]);
 
   const handlePayment = () => {
-    if (!selectedTime || !/^\d{10}$/.test(mobile)) {
-      console.log("Time or mobile not valid");
-      return;
+    if (!selectedTime || !/^[0-9]{10}$/.test(mobile)) return;
+
+    const [timeString, period] = selectedTime.split(" ");
+    let [hour, minute] = timeString.split(":").map(Number);
+
+    if (period === "PM" && hour !== 12) hour += 12;
+    if (period === "AM" && hour === 12) hour = 0;
+
+    const bookingDateTime = new Date(selectedDate);
+    bookingDateTime.setHours(hour, minute, 0, 0);
+
+    // Format local date manually
+    function formatLocalToISOString(date) {
+      const pad = (num) => String(num).padStart(2, "0");
+      const year = date.getFullYear();
+      const month = pad(date.getMonth() + 1);
+      const day = pad(date.getDate());
+      const hours = pad(date.getHours());
+      const minutes = pad(date.getMinutes());
+      const seconds = pad(date.getSeconds());
+
+      return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
     }
 
-    const [hour, minute] = selectedTime.split(":");
-    const bookingDateTime = new Date(selectedDate);
-    bookingDateTime.setHours(Number(hour));
-    bookingDateTime.setMinutes(Number(minute));
-    bookingDateTime.setSeconds(0);
-    bookingDateTime.setMilliseconds(0);
+    const finalDateString = formatLocalToISOString(bookingDateTime);
 
-    setIsPaying(true);
+    const appointmentData = {
+      service: serviceId, // replace with actual service ID
+      start: finalDateString,
+      name: name,
+      mobile: mobile,
+      note: note || "", // optional
+    };
 
-    setTimeout(() => {
-      setIsPaying(false);
-      setPaymentDone(true);
+    //console.log("appointmentData", appointmentData);
 
-      // Redirect after 1.5 seconds
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-    }, 2000); // Simulate 2 seconds payment processing
+    dispatch(bookAppointment(appointmentData));
   };
+
+  useEffect(() => {
+    if (appointment?.success) {
+      dispatch(resetAppointmentState());
+
+      setToastMessage("Payment Successful!");
+      setToastSeverity("success");
+      setShowToast(true);
+
+      setTimeout(() => navigate("/"), 2000);
+    }
+  }, [appointment, navigate]);
 
   return (
     <Box
@@ -183,45 +183,40 @@ const BookingPage = () => {
       >
         {!loadingSingleService && (
           <>
-            <Typography variant="h5" fontWeight="bold" gutterBottom>
+            <Typography variant="h5" fontWeight="bold">
               Book Appointment
             </Typography>
             <Typography
               variant="subtitle1"
               sx={{ color: "primary.main", fontWeight: "bold" }}
             >
-              {service?.category?.charAt(0).toUpperCase() +
-                service?.category?.slice(1)}
+              {service?.category}
             </Typography>
-
             <Typography
               variant="subtitle2"
               sx={{ color: "secondary.main", fontWeight: "bold" }}
             >
-              {service?.admin?.name.charAt(0).toUpperCase() +
-                service?.admin?.name.slice(1)}
+              {service?.admin?.name}
             </Typography>
             <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
               <Typography sx={{ color: "orange", mr: 1, fontWeight: "bold" }}>
                 ⭐ {service?.avgRating}
               </Typography>
-              <Typography
-                variant="body2"
-                color="text.primary"
-                fontWeight="bold"
-              >
+              <Typography variant="body2" fontWeight="bold">
                 {service?.address}
               </Typography>
             </Box>
           </>
         )}
-        <Box sx={{ height: "1px", backgroundColor: "#ccc", mt: 2 }} />
 
-        <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
+        <Box sx={{ mt: 4, display: "flex", justifyContent: "space-between" }}>
           {dates.map((date, idx) => (
             <Button
               key={idx}
-              onClick={() => setSelectedDate(date)}
+              onClick={() => {
+                setSelectedTime("");
+                setSelectedDate(date);
+              }}
               variant={
                 selectedDate.toDateString() === date.toDateString()
                   ? "contained"
@@ -241,8 +236,6 @@ const BookingPage = () => {
             </Button>
           ))}
         </Box>
-
-        <Box sx={{ height: "1px", backgroundColor: "#ccc", mt: 2 }} />
 
         <Grid container spacing={2} mt={4}>
           {availableSlots.length > 0 ? (
@@ -269,11 +262,6 @@ const BookingPage = () => {
               fullWidth
               value={name}
               onChange={(e) => setName(e.target.value)}
-              error={name !== "" && name.trim() === ""}
-              helperText={
-                name !== "" && name.trim() === "" ? "Name is required" : ""
-              }
-              sx={{ maxWidth: "300px" }}
               required
             />
           </Grid>
@@ -283,113 +271,61 @@ const BookingPage = () => {
               fullWidth
               value={mobile}
               onChange={(e) => setMobile(e.target.value)}
-              error={mobile !== "" && !/^\d{10}$/.test(mobile)}
+              error={mobile !== "" && !/^[0-9]{10}$/.test(mobile)}
               helperText={
-                mobile !== "" && !/^\d{10}$/.test(mobile)
-                  ? "Enter a valid 10-digit mobile number"
+                mobile !== "" && !/^[0-9]{10}$/.test(mobile)
+                  ? "Enter valid 10-digit number"
                   : ""
               }
-              sx={{ maxWidth: "300px" }}
               required
             />
           </Grid>
           <Grid item xs={12} sm={4}>
             <TextField
-              label="Special Note (Optional)"
+              label="Note (optional)"
               fullWidth
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              multiline
-              minRows={4}
             />
           </Grid>
         </Grid>
 
-        {/* <Box sx={{ p: 2, display: "flex", justifyContent: "center" }}>
+        <Box mt={4}>
+          <Typography>Total Cost: ${serviceCost}</Typography>
+          <Typography>Membership Discount: ${membershipDiscount}</Typography>
+          <Typography variant="h6">Amount Due: ${totalDue}</Typography>
+        </Box>
+
+        <Box mt={2}>
           <Button
             variant="contained"
-            sx={{ px: 4 }}
-            onClick={handleContinue}
-            disabled={!selectedTime || !/^\d{10}$/.test(mobile)}
+            color="primary"
+            onClick={handlePayment}
+            disabled={
+              loadingAppointment ||
+              appointment?.success ||
+              !selectedTime ||
+              !name.trim() ||
+              !/^[0-9]{10}$/.test(mobile)
+            }
           >
-            Continue
-          </Button>
-        </Box> */}
-        <Box sx={{ margin: 10 }}>
-          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-            <Typography>Service Cost</Typography>
-            <Typography>${serviceCost?.toFixed(2)}</Typography>
-          </Box>
-
-          {/* Only show Membership Discount if authenticated */}
-          {isAuthenticated && membershipDiscount > 0 && (
-            <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
-            >
-              <Typography>
-                Membership Discount
-                {currentMembership?.membership?.plan === "yearly" &&
-                  " (10% - Yearly Plan)"}
-                {currentMembership?.membership?.plan === "monthly" &&
-                  " (5% - Monthly Plan)"}
-              </Typography>
-              <Typography sx={{ color: "green" }}>
-                -${membershipDiscount.toFixed(2)}
-              </Typography>
-            </Box>
-          )}
-
-          <Divider sx={{ my: 2 }} />
-
-          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-            <Typography fontWeight="bold">Total Due</Typography>
-            <Typography fontWeight="bold">${totalDue.toFixed(2)}</Typography>
-          </Box>
-
-          {/* Payment Section */}
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            {!paymentDone ? (
-              <>
-                <Button
-                  variant="contained"
-                  sx={{ px: 5, py: 1.2, borderRadius: 2 }}
-                  onClick={handlePayment}
-                  disabled={
-                    isPaying ||
-                    !isAuthenticated ||
-                    !selectedTime ||
-                    !/^\d{10}$/.test(mobile) ||
-                    name.trim() === ""
-                  }
-                >
-                  {isPaying ? (
-                    <CircularProgress size={24} color="inherit" />
-                  ) : (
-                    "Make Payment"
-                  )}
-                </Button>
-
-                {/* Show message if user is not logged in */}
-                {!isAuthenticated && (
-                  <Typography variant="body2" color="error" mt={2}>
-                    Please login to make a payment.
-                  </Typography>
-                )}
-              </>
+            {loadingAppointment ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : appointment?.success ? (
+              "Payment Successful"
             ) : (
-              <Typography variant="h6" color="green" fontWeight="bold">
-                Payment Successful! Redirecting...
-              </Typography>
+              "Proceed to Pay"
             )}
-          </Box>
+          </Button>
         </Box>
       </Box>
+      {/* Toast Notifications */}
+      <CommonToast
+        open={showToast}
+        message={toastMessage}
+        severity={toastSeverity}
+        onClose={() => setShowToast(false)}
+      />
     </Box>
   );
 };

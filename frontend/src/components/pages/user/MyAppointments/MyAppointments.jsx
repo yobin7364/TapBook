@@ -86,10 +86,6 @@ const MyAppointments = () => {
   const [reviewText, setReviewText] = useState("");
   const [appointmentToReview, setAppointmentToReview] = useState(null);
 
-  const handleUpdate = () => {
-    navigate("/updateAppointment");
-  };
-
   const handleCancel = (appointment) => {
     setAppointmentToCancel(appointment);
     setOpenCancelDialog(true);
@@ -213,9 +209,6 @@ const MyAppointments = () => {
                 </Typography>
 
                 <Box sx={{ display: "flex", gap: 2 }}>
-                  <Button variant="outlined" onClick={() => handleUpdate()}>
-                    Update
-                  </Button>
                   <Button
                     variant="outlined"
                     color="error"

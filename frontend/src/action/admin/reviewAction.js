@@ -5,9 +5,9 @@ import axios from "axios";
 // Get Reviews by Provider ID
 export const getProviderReviews = createAsyncThunk(
   "admin/get/providerReviews",
-  async (providerId, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(`/api/reviews/user/${providerId}`);
+      const { data } = await axios.get(`/api/reviews/user`);
       return data.reviews;
     } catch (error) {
       return rejectWithValue(

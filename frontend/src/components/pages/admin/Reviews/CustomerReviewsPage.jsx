@@ -13,14 +13,13 @@ import { getProviderReviews } from "../../../../action/admin/reviewAction";
 
 const CustomerReviewsPage = () => {
   const dispatch = useDispatch();
-  const hardcodedProviderId = "6839086a7c820c655abfe2d6";
 
   const { loading, reviews, error } = useSelector(
     (state) => state.providerReviews
   );
 
   useEffect(() => {
-    dispatch(getProviderReviews(hardcodedProviderId));
+    dispatch(getProviderReviews());
   }, [dispatch]);
 
   return (

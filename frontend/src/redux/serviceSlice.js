@@ -8,7 +8,10 @@ import {
   getMyService,
 } from "../action/admin/serviceSettingAction";
 
-import { getSerivesList } from "../action/customer/servicesListAction";
+import {
+  getSerivesList,
+  bookAppointment,
+} from "../action/customer/servicesListAction";
 
 const initialState = {
   // Add Service
@@ -40,12 +43,23 @@ const initialState = {
   myService: {},
   loadingMyService: false,
   errorMyService: null,
+
+  // Book Appointment
+  appointment: null,
+  loadingAppointment: false,
+  errorAppointment: null,
 };
 
 const serviceSlice = createSlice({
   name: "service",
   initialState,
-  reducers: {},
+  reducers: {
+    resetAppointmentState: (state) => {
+      state.appointment = null;
+      state.loadingAppointment = false;
+      state.errorAppointment = null;
+    },
+  },
   extraReducers: (builder) => {
     // Add Service
     builder
@@ -114,7 +128,7 @@ const serviceSlice = createSlice({
       })
       .addCase(getAvailableSlotsByDate.fulfilled, (state, action) => {
         state.loadingAvailableSlots = false;
-        state.availableSlots = action.payload;
+        state.availableSlots = action.payload.slots;
       })
       .addCase(getAvailableSlotsByDate.rejected, (state, action) => {
         state.loadingAvailableSlots = false;
@@ -135,7 +149,24 @@ const serviceSlice = createSlice({
         state.loadingMyService = false;
         state.errorMyService = action.payload;
       });
+
+    // Book Appointment
+    builder
+      .addCase(bookAppointment.pending, (state) => {
+        state.loadingAppointment = true;
+        state.errorAppointment = null;
+      })
+      .addCase(bookAppointment.fulfilled, (state, action) => {
+        state.loadingAppointment = false;
+        state.appointment = action.payload;
+      })
+      .addCase(bookAppointment.rejected, (state, action) => {
+        state.loadingAppointment = false;
+        state.errorAppointment = action.payload;
+      });
   },
 });
+
+export const { resetAppointmentState } = serviceSlice.actions;
 
 export default serviceSlice.reducer;
