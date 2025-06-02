@@ -1,5 +1,5 @@
 // ServiceSettingsPage.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -16,6 +16,8 @@ import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import CommonToast from "../../../common/CommonToast";
+import { useSelector, useDispatch } from "react-redux";
+import { getMyService } from "../../../../action/admin/serviceSettingAction";
 
 const daysOfWeek = [
   "Monday",
@@ -38,6 +40,7 @@ const defaultHours = daysOfWeek.reduce((acc, day) => {
 
 const ServiceSettingsPage = () => {
   const [isEditMode, setIsEditMode] = useState(false);
+  const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [duration, setDuration] = useState("");
   const [address, setAddress] = useState("");
@@ -45,9 +48,40 @@ const ServiceSettingsPage = () => {
   const [businessHours, setBusinessHours] = useState(defaultHours);
   const [tempHours, setTempHours] = useState(defaultHours);
   const [toastOpen, setToastOpen] = useState(false);
+  const dispatch = useDispatch();
+
+  const { myService, loadingMyService } = useSelector((state) => state.service);
+
+  useEffect(() => {
+    dispatch(getMyService());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (myService?.service) {
+      const { name, category, duration, address, price } = myService.service;
+      setName(name || "");
+      setCategory(category || "");
+      setDuration(duration || "");
+      setAddress(address || "");
+      setPrice(price?.toString() || "");
+      // Optional: Load business hours from backend if available
+    } else {
+      setName("");
+      setCategory("");
+      setDuration("");
+      setAddress("");
+      setPrice("");
+      setBusinessHours(defaultHours);
+      setTempHours(defaultHours);
+    }
+  }, [myService]);
 
   const isInitialEmpty =
-    !category && !duration && !address && (!price || Number(price) <= 0);
+    !name &&
+    !category &&
+    !duration &&
+    !address &&
+    (!price || Number(price) <= 0);
 
   const hasInvalidTimes = () => {
     return daysOfWeek.some((day) => {
@@ -61,10 +95,12 @@ const ServiceSettingsPage = () => {
   };
 
   const handleSave = () => {
-    if (hasInvalidTimes() || !isValidPrice(price)) return;
+    if (!name || hasInvalidTimes() || !isValidPrice(price)) return;
     setBusinessHours(tempHours);
     setIsEditMode(false);
     setToastOpen(true);
+
+    // TODO: Dispatch save action here
   };
 
   const toggleClosed = (day) => {
@@ -100,15 +136,26 @@ const ServiceSettingsPage = () => {
           <Box px={4} pb={4}>
             {!isEditMode ? (
               <Box>
-                {isInitialEmpty ? (
+                {myService?.service === null ? (
                   <Button
                     variant="contained"
-                    onClick={() => setIsEditMode(true)}
+                    onClick={() => {
+                      setIsEditMode(true);
+                      setName("");
+                      setCategory("");
+                      setDuration("");
+                      setAddress("");
+                      setPrice("");
+                      setTempHours(defaultHours);
+                    }}
                   >
                     Add Service
                   </Button>
                 ) : (
                   <Box>
+                    <Typography>
+                      <strong>Name:</strong> {name}
+                    </Typography>
                     <Typography>
                       <strong>Category:</strong> {category}
                     </Typography>
@@ -123,11 +170,7 @@ const ServiceSettingsPage = () => {
                     </Typography>
                     <Box
                       mt={3}
-                      sx={{
-                        backgroundColor: "#f5f5f5",
-                        p: 2,
-                        borderRadius: 1,
-                      }}
+                      sx={{ backgroundColor: "#f5f5f5", p: 2, borderRadius: 1 }}
                     >
                       <Typography variant="h6" fontWeight="bold" mb={1}>
                         Business Hours
@@ -166,6 +209,15 @@ const ServiceSettingsPage = () => {
             ) : (
               <Box>
                 <Grid container spacing={2}>
+                  <Grid item xs={12} sm={3}>
+                    <Typography fontWeight="bold">Name *</Typography>
+                    <TextField
+                      fullWidth
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </Grid>
                   <Grid item xs={12} sm={3}>
                     <Typography fontWeight="bold">Category</Typography>
                     <Select
@@ -280,7 +332,9 @@ const ServiceSettingsPage = () => {
                   <Button
                     variant="contained"
                     onClick={handleSave}
-                    disabled={hasInvalidTimes() || !price || Number(price) < 0}
+                    disabled={
+                      !name || hasInvalidTimes() || !price || Number(price) < 0
+                    }
                   >
                     Save
                   </Button>

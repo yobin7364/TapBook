@@ -26,6 +26,7 @@ import { jwtDecode } from "jwt-decode";
 import { setCurrentUser, logout } from "./redux/authSlice";
 import PrivateRoute from "./components/common/PrivateRoute";
 import ReportPage from "./components/pages/admin/ReportPage/ReportPage";
+import AddServiceForm from "./components/pages/admin/Service/AddServiceForm";
 
 if (localStorage.authToken) {
   setAuthToken(localStorage.authToken);
@@ -67,6 +68,8 @@ function App() {
               path="/cancelAppointments"
               element={<CancelAppointments />}
             />
+
+            <Route path="/addServiceForm" element={<AddServiceForm />} />
           </Route>
         ) : (
           <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>

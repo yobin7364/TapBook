@@ -120,6 +120,21 @@ const serviceSlice = createSlice({
         state.loadingAvailableSlots = false;
         state.errorAvailableSlots = action.payload;
       });
+
+    // Get My Service
+    builder
+      .addCase(getMyService.pending, (state) => {
+        state.loadingMyService = true;
+        state.errorMyService = null;
+      })
+      .addCase(getMyService.fulfilled, (state, action) => {
+        state.loadingMyService = false;
+        state.myService = action.payload;
+      })
+      .addCase(getMyService.rejected, (state, action) => {
+        state.loadingMyService = false;
+        state.errorMyService = action.payload;
+      });
   },
 });
 
