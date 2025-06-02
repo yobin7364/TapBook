@@ -7,7 +7,7 @@ export const getProviderReviews = createAsyncThunk(
   "admin/get/providerReviews",
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await axios.get(`/api/reviews/user`);
+      const { data } = await axios.get(`/api/reviews/mine`);
       return data.reviews;
     } catch (error) {
       return rejectWithValue(
