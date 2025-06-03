@@ -514,7 +514,8 @@ export const deleteService = async (req, res) => {
 export const getMyService = async (req, res) => {
   try {
     const svc = await Service.findOne({ admin: req.user.id })
-      .select('serviceName price category duration address businessHours')
+      .select('serviceName price category duration address businessHours admin')
+      .populate('admin', 'name')
       .lean()
 
     if (!svc) {
