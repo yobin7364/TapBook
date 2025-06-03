@@ -117,9 +117,7 @@ const UserNavbar = () => {
                     color="inherit"
                     onClick={() => navigate("/notifications")}
                   >
-                    <Badge badgeContent={3} color="error">
-                      <NotificationsIcon />
-                    </Badge>
+                    <NotificationsIcon />
                   </IconButton>
                 </Tooltip>
 

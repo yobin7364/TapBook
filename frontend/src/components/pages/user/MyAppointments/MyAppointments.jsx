@@ -126,6 +126,10 @@ const MyAppointments = () => {
     setToastMessage("Review submitted successfully!");
     setShowToast(true);
   };
+  const capitalizeFirst = (str) => {
+    if (!str) return "";
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
 
   return (
     <Box
@@ -203,10 +207,11 @@ const MyAppointments = () => {
                   })}
                 </Typography>
                 <Typography variant="subtitle1" fontWeight="bold">
-                  {appointment.service?.serviceName || "nan"}
+                  {capitalizeFirst(appointment.service?.category) || "NaN"}
                 </Typography>
+
                 <Typography variant="body2" color="text.secondary" mb={2}>
-                  with {appointment.service?.name}
+                  with {capitalizeFirst(appointment.service?.admin?.name)}
                 </Typography>
 
                 <Box sx={{ display: "flex", gap: 2 }}>
@@ -284,10 +289,12 @@ const MyAppointments = () => {
                 </Typography>
                 <Typography sx={{ mt: 2 }}>
                   <strong>Service:</strong>{" "}
-                  {appointmentToCancel.service?.category || "nan"}
+                  {capitalizeFirst(appointmentToCancel.service?.category) ||
+                    "nan"}
                 </Typography>
                 <Typography>
-                  <strong>Doctor:</strong> {appointmentToCancel.service?.name}
+                  <strong>Doctor:</strong>{" "}
+                  {capitalizeFirst(appointmentToCancel.service?.admin?.name)}
                 </Typography>
                 <Typography>
                   <strong>Date:</strong>{" "}

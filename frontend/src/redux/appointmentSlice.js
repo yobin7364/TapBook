@@ -4,6 +4,7 @@ import {
   getPastAppointments,
   cancelAppointment,
   updateAppointment,
+  getUserNotification,
 } from "../action/customer/appointmentAction";
 
 const initialState = {
@@ -21,6 +22,10 @@ const initialState = {
   updating: false,
   updateSuccess: false,
   errorUpdate: null,
+
+  notification: {},
+  loadingNotification: false,
+  errorNotification: false,
 };
 
 const appointmentSlice = createSlice({
@@ -95,6 +100,21 @@ const appointmentSlice = createSlice({
       .addCase(updateAppointment.rejected, (state, action) => {
         state.updating = false;
         state.errorUpdate = action.payload;
+      });
+
+    // Notification
+    builder
+      .addCase(getUserNotification.pending, (state) => {
+        state.loadingNotification = true;
+        state.errorNotification = null;
+      })
+      .addCase(getUserNotification.fulfilled, (state, action) => {
+        state.loadingNotification = false;
+        state.notification = action.payload;
+      })
+      .addCase(getUserNotification.rejected, (state, action) => {
+        state.loadingNotification = false;
+        state.errorNotification = action.payload;
       });
   },
 });

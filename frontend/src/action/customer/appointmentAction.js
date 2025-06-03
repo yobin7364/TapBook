@@ -67,3 +67,20 @@ export const cancelAppointment = createAsyncThunk(
     }
   }
 );
+
+// get user notification
+export const getUserNotification = createAsyncThunk(
+  "notification/user",
+  async ({ page, limit }, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.get(
+        `/api/notifications?page=${page}&limit=${limit}`
+      );
+      return data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to fetch past appointments"
+      );
+    }
+  }
+);

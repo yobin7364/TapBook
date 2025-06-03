@@ -1,68 +1,30 @@
-import React, { useState } from "react";
-import { Box, Typography, Divider, Grid, Pagination } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import {
+  Box,
+  Typography,
+  Divider,
+  Grid,
+  Pagination,
+  CircularProgress,
+} from "@mui/material";
+import { useDispatch, useSelector } from "react-redux";
+import { getUserNotification } from "../../../../action/customer/appointmentAction";
 
 const Notifications = () => {
-  // Mock notifications
-  const notifications = [
-    {
-      id: 1,
-      service: "Therapy Session",
-      date: "2025-04-30",
-      time: "09:00",
-      status: "Upcoming",
-    },
-    {
-      id: 2,
-      service: "Therapy Session",
-      date: "2025-05-03",
-      time: "11:00",
-      status: "Upcoming",
-    },
-    {
-      id: 3,
-      service: "Therapy Session",
-      date: "2025-05-06",
-      time: "14:00",
-      status: "Upcoming",
-    },
-    {
-      id: 4,
-      service: "Dental Cleaning",
-      date: "2025-05-10",
-      time: "10:00",
-      status: "Upcoming",
-    },
-    {
-      id: 5,
-      service: "Yoga Class",
-      date: "2025-05-11",
-      time: "08:00",
-      status: "Upcoming",
-    },
-    {
-      id: 6,
-      service: "Nutrition Consultation",
-      date: "2025-05-12",
-      time: "13:00",
-      status: "Upcoming",
-    },
-    {
-      id: 7,
-      service: "Physiotherapy",
-      date: "2025-05-15",
-      time: "09:30",
-      status: "Upcoming",
-    },
-  ];
-
+  const dispatch = useDispatch();
   const [page, setPage] = useState(1);
-  const itemsPerPage = 5;
+  const limit = 5;
 
-  const startIndex = (page - 1) * itemsPerPage;
-  const paginatedNotifications = notifications.slice(
-    startIndex,
-    startIndex + itemsPerPage
+  const { loadingNotification, notification, errorNotification } = useSelector(
+    (state) => state.userAppointment
   );
+
+  useEffect(() => {
+    dispatch(getUserNotification({ page, limit }));
+  }, [dispatch, page]);
+
+  const notifications = notification?.notifications || [];
+  const pagination = notification?.pagination || {};
 
   return (
     <Box
@@ -92,43 +54,54 @@ const Notifications = () => {
 
         <Divider sx={{ mb: 4 }} />
 
-        {/* Notifications List */}
-        <Grid container spacing={2}>
-          {paginatedNotifications.map((notif) => (
-            <Grid item xs={12} key={notif.id}>
-              <Box sx={{ p: 2, border: "1px solid #ccc", borderRadius: 2 }}>
-                <Typography fontWeight="bold">{notif.service}</Typography>
-                <Typography color="text.secondary">
-                  {new Date(`${notif.date}T${notif.time}`).toLocaleString(
-                    "en-US",
-                    {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true,
-                    }
-                  )}
-                </Typography>
-                <Typography color="primary" fontWeight="bold" mt={1}>
-                  {notif.status}
-                </Typography>
-              </Box>
-            </Grid>
-          ))}
-        </Grid>
-
-        {/* Pagination */}
-        {notifications.length > itemsPerPage && (
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-            <Pagination
-              count={Math.ceil(notifications.length / itemsPerPage)}
-              page={page}
-              onChange={(e, value) => setPage(value)}
-              color="primary"
-            />
+        {loadingNotification ? (
+          <Box display="flex" justifyContent="center" mt={5}>
+            <CircularProgress />
           </Box>
+        ) : errorNotification ? (
+          <Typography color="error">{errorNotification}</Typography>
+        ) : (
+          <>
+            {/* Notifications List */}
+            <Grid container spacing={2}>
+              {notifications.map((notif) => (
+                <Grid item xs={12} key={notif.id}>
+                  <Box sx={{ p: 2, border: "1px solid #ccc", borderRadius: 2 }}>
+                    <Typography fontWeight="bold">{notif.message}</Typography>
+                    <Typography color="text.secondary">
+                      {new Date(notif.date).toLocaleString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
+                    </Typography>
+                    <Typography
+                      color={notif.read ? "text.secondary" : "primary"}
+                      fontWeight="bold"
+                      mt={1}
+                    >
+                      {notif.read ? "Read" : "Unread"}
+                    </Typography>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+
+            {/* Pagination */}
+            {pagination.pages > 1 && (
+              <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+                <Pagination
+                  count={pagination.pages}
+                  page={pagination.page}
+                  onChange={(e, value) => setPage(value)}
+                  color="primary"
+                />
+              </Box>
+            )}
+          </>
         )}
       </Box>
     </Box>
