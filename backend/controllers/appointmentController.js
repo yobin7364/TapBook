@@ -338,12 +338,15 @@ export const getUpcomingAppointments = async (req, res) => {
     const upcoming = await Appointment.find({
       customer: req.user.id,
       'slot.start': { $gte: now },
-      status: { $in: ['pending','confirmed'] }
+      status: { $in: ['pending', 'confirmed'] },
     })
-    .populate('service','serviceName price duration address')
-    .populate('customer','name email')
-    .sort({ 'slot.start': 1 })
-
+      .populate({
+        path: 'service',
+        select: 'serviceName category price duration address admin',
+        populate: { path: 'admin', select: 'name' },
+      })
+      .populate('customer', 'name email')
+      .sort({ 'slot.start': 1 })
     return res.json({ success: true, upcoming })
   } catch (err) {
     console.error('Get upcoming error:', err)
