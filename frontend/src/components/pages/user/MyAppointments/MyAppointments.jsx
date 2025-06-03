@@ -192,7 +192,8 @@ const MyAppointments = () => {
                 }}
               >
                 <Typography fontWeight="bold" gutterBottom>
-                  {new Date(appointment.slot.start).toLocaleString("en-US", {
+                  {new Date(appointment.slot.start).toLocaleString("en-GB", {
+                    timeZone: "UTC",
                     month: "long",
                     day: "numeric",
                     year: "numeric",
@@ -202,7 +203,7 @@ const MyAppointments = () => {
                   })}
                 </Typography>
                 <Typography variant="subtitle1" fontWeight="bold">
-                  {appointment.service?.category || "nan"}
+                  {appointment.service?.serviceName || "nan"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" mb={2}>
                   with {appointment.service?.name}
@@ -291,8 +292,9 @@ const MyAppointments = () => {
                 <Typography>
                   <strong>Date:</strong>{" "}
                   {new Date(appointmentToCancel.slot.start).toLocaleString(
-                    "en-US",
+                    "en-GB",
                     {
+                      timeZone: "UTC",
                       month: "long",
                       day: "numeric",
                       year: "numeric",

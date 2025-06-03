@@ -45,8 +45,8 @@ const BookingPage = () => {
 
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const {
-    availableSlots: slotsFromAPI,
-    loadingAvailableSlots,
+    // availableSlots: slotsFromAPI,
+    // loadingAvailableSlots,
     appointment,
     loadingAppointment,
   } = useSelector((state) => state.service);
@@ -86,7 +86,8 @@ const BookingPage = () => {
             available: slot.available,
           };
         });
-        setAvailableSlots(slotsWithFormattedTime.map((s) => s.time));
+
+        setAvailableSlots(slotsWithFormattedTime);
       });
     }
   }, [dispatch, serviceId, selectedDate]);
@@ -239,14 +240,17 @@ const BookingPage = () => {
 
         <Grid container spacing={2} mt={4}>
           {availableSlots.length > 0 ? (
-            availableSlots.map((time, idx) => (
+            availableSlots.map((eachSlot, idx) => (
               <Grid item xs={4} sm={3} md={2} key={idx}>
                 <Button
                   fullWidth
-                  variant={selectedTime === time ? "contained" : "outlined"}
-                  onClick={() => setSelectedTime(time)}
+                  disabled={!eachSlot?.available}
+                  variant={
+                    selectedTime === eachSlot?.time ? "contained" : "outlined"
+                  }
+                  onClick={() => setSelectedTime(eachSlot?.time)}
                 >
-                  {time}
+                  {eachSlot?.time}
                 </Button>
               </Grid>
             ))
