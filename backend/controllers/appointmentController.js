@@ -285,28 +285,30 @@ export const updateAppointment = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
-
 // @route   GET /api/appointments/past
-// @desc    List all past appointments (slot.end < now) for the user
+// @desc    List all past (completed) appointments for the user
 // @access  Private (user)
 export const getPastAppointments = async (req, res) => {
   try {
-    const page = Math.max(parseInt(req.query.page) || 1, 1)
+    const page  = Math.max(parseInt(req.query.page)  || 1,  1)
     const limit = Math.max(parseInt(req.query.limit) || 10, 1)
-    const skip = (page - 1) * limit
-    const now = new Date()
-    // 1) total count of past appointments
+    const skip  = (page - 1) * limit
+    const now   = new Date()
+
+    // 1) total count of past‐completed appointments
     const total = await Appointment.countDocuments({
-      customer: req.user.id,
+      customer:   req.user.id,
+      status:     'completed',           // only completed
       'slot.end': { $lt: now },
     })
 
+    // 2) fetch one page of those past‐completed appointments
     const past = await Appointment.find({
-      customer: req.user.id,
+      customer:   req.user.id,
+      status:     'completed',
       'slot.end': { $lt: now },
     })
-      // bring in service details & customer info
-      .populate('service', 'serviceName price duration address')
+      .populate('service',  'serviceName price duration address')
       .populate('customer', 'name email')
       .sort({ 'slot.start': -1 }) // most recent first
       .skip(skip)
@@ -327,6 +329,7 @@ export const getPastAppointments = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
+
 
 
 // @route   GET /api/appointments/upcoming
@@ -565,44 +568,69 @@ If you have questions, please contact support.`,
 // @desc    List user notifications 
 // @access  Private (user)
 export const getNotifications = async (req, res) => {
-  const page  = Math.max(parseInt(req.query.page)  || 1, 1)
+  const page = Math.max(parseInt(req.query.page) || 1, 1)
   const limit = Math.max(parseInt(req.query.limit) || 10, 1)
-  const skip  = (page - 1) * limit
+  const skip = (page - 1) * limit
 
   try {
+    // 1) total count
     const total = await Notification.countDocuments({ user: req.user.id })
 
+    // 2) fetch page, populating appointment → service → admin
     const notes = await Notification.find({ user: req.user.id })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
+      .populate({
+        path: 'appointment',
+        select: 'status service',
+        populate: {
+          path: 'service',
+          select: 'serviceName category admin',
+          populate: {
+            path: 'admin',
+            select: 'name',
+          },
+        },
+      })
       .lean()
 
-    const notifications = notes.map(n => ({
-      id:          n._id,
-      type:        n.type,            // 'status' or 'reminder'
-      message:     n.message,
-      appointment: n.appointment,     
-      read:        n.read,
-      date:        n.createdAt
-    }))
+    // 3) shape for front‐end
+    const notifications = notes.map((n) => {
+      // appointment might be null (e.g. a reminder without appointment), so guard
+      const appt = n.appointment || {}
+      const svc = appt.service || {}
+      const adm = svc.admin || {}
+
+      return {
+        id: n._id,
+        type: n.type, // 'status' or 'reminder'
+        message: n.message,
+        appointment: appt._id || null, // appointment ID, if any
+        status: appt.status || null, // appointment status: "confirmed", "cancelled", etc.
+        serviceName: svc.serviceName || null,
+        categoryName: svc.category || null,
+        adminName: adm.name || null,
+        read: n.read,
+        date: n.createdAt,
+      }
+    })
 
     return res.json({
-      success:       true,
+      success: true,
       notifications,
       pagination: {
         total,
         page,
-        pages:  Math.ceil(total / limit),
-        limit
-      }
+        pages: Math.ceil(total / limit),
+        limit,
+      },
     })
   } catch (err) {
     console.error('Get notifications error:', err)
     return res.status(500).json({ success: false, error: 'Server error' })
   }
 }
-
 
 // @route   PUT /api/appointments/:id/cancel
 // @desc    Cancel appointment by user with cancelNote required
