@@ -365,16 +365,22 @@ export const getPastAppointments = async (req, res) => {
 
     // 2) fetch one page of those past‐completed appointments
     const past = await Appointment.find({
-      customer:   req.user.id,
-      status:     'completed',
+      customer: req.user.id,
+      status: 'completed',
       'slot.end': { $lt: now },
     })
-      .populate('service',  'serviceName price duration address')
-      .populate('customer', 'name email')
       .sort({ 'slot.start': -1 }) // most recent first
       .skip(skip)
       .limit(limit)
-
+      .populate('customer', 'name email') // if you still want the customer info
+      .populate({
+        path: 'service',
+        select: 'serviceName category price duration address admin',
+        populate: {
+          path: 'admin',
+          select: 'name',
+        },
+      })
     return res.json({
       success: true,
       past,
