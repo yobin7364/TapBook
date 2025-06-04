@@ -5,10 +5,11 @@ const { Schema } = mongoose
 const NotificationSchema = new Schema(
   {
     user: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
+   
     type: {
       type: String,
       enum: ['status', 'reminder'],
@@ -19,7 +20,7 @@ const NotificationSchema = new Schema(
       required: true,
     },
     appointment: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'Appointment',
     },
     read: {

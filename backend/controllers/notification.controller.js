@@ -5,6 +5,7 @@ import Notification from '../models/Notification.module.js'
 // @desc    List user notifications (status‐change, reminders, etc.), paginated
 // @access  Private (user)
 export const getNotifications = async (req, res) => {
+  console.log("AA")
   const page = Math.max(parseInt(req.query.page) || 1, 1)
   const limit = Math.max(parseInt(req.query.limit) || 10, 1)
   const skip = (page - 1) * limit
@@ -18,16 +19,28 @@ export const getNotifications = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
+      .populate({
+        path: 'appointment',
+        select: 'status service',
+        populate: {
+          path: 'service',
+          select: 'serviceName',
+        },
+      })
       .lean()
 
-    const notifications = notes.map((n) => ({
+    const notifications = notes.map((n) => {
+        const appt = n.appointment || {}
+        const svc = appt.service || {}
+
+        return {
       id: n._id,
-      type: n.type, // 'status' or 'reminder'
       message: n.message,
-      appointment: n.appointment, // optional appointment _id
+      appointment: n.appointment || null, // optional appointment _id
+      serviceName : svc.serviceName || null,
       read: n.read,
       date: n.createdAt,
-    }))
+    }})
 
     return res.json({
       success: true,

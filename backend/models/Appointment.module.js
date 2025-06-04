@@ -14,7 +14,7 @@ const AppointmentSchema = new Schema(
 
     },
     service: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: 'Service',
       required: true,
     },

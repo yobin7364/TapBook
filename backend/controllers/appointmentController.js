@@ -568,9 +568,10 @@ If you have questions, please contact support.`,
 // @desc    List user notifications 
 // @access  Private (user)
 export const getNotifications = async (req, res) => {
-  const page = Math.max(parseInt(req.query.page) || 1, 1)
+  
+  const page  = Math.max(parseInt(req.query.page)  || 1, 1)
   const limit = Math.max(parseInt(req.query.limit) || 10, 1)
-  const skip = (page - 1) * limit
+  const skip  = (page - 1) * limit
 
   try {
     // 1) total count
@@ -589,9 +590,9 @@ export const getNotifications = async (req, res) => {
           select: 'serviceName category admin',
           populate: {
             path: 'admin',
-            select: 'name',
-          },
-        },
+            select: 'name'
+          }
+        }
       })
       .lean()
 
@@ -599,32 +600,32 @@ export const getNotifications = async (req, res) => {
     const notifications = notes.map((n) => {
       // appointment might be null (e.g. a reminder without appointment), so guard
       const appt = n.appointment || {}
-      const svc = appt.service || {}
-      const adm = svc.admin || {}
+      const svc  = appt.service    || {}
+      const adm  = svc.admin       || {}
 
       return {
-        id: n._id,
-        type: n.type, // 'status' or 'reminder'
-        message: n.message,
-        appointment: appt._id || null, // appointment ID, if any
-        status: appt.status || null, // appointment status: "confirmed", "cancelled", etc.
-        serviceName: svc.serviceName || null,
-        categoryName: svc.category || null,
-        adminName: adm.name || null,
-        read: n.read,
-        date: n.createdAt,
+        id:           n._id,
+        type:         n.type,  
+        message:      n.message,
+        appointment:  appt._id || null,  // appointment ID, if any
+        status:       appt.status || null,   // appointment status: "confirmed", "cancelled", etc.
+        serviceName:  svc.serviceName || null,
+        categoryName: svc.category    || null,
+        adminName:    adm.name        || null,
+        read:         n.read,
+        date:         n.createdAt
       }
     })
 
     return res.json({
-      success: true,
+      success:       true,
       notifications,
       pagination: {
         total,
         page,
-        pages: Math.ceil(total / limit),
-        limit,
-      },
+        pages:  Math.ceil(total / limit),
+        limit
+      }
     })
   } catch (err) {
     console.error('Get notifications error:', err)

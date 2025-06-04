@@ -9,7 +9,6 @@ import { getServices,getMyService } from '../controllers/serviceController.js'
 // @desc    List & filter services (public)
 // @access  Public
 router.get('/categories', getCategories)
-router.get('/', publicListServices)
 router.get('/:id/available-slots', getAvailableSlots)
 // Public endpoint for fetching & filtering services
 // GET /api/services?search=…&category=…&date=…&startTime=…&endTime=…&minRating=…&sortBy=…&sortOrder=…&page=…&limit=…

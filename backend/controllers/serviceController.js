@@ -188,6 +188,7 @@ export const createService = async (req, res) => {
 }
 
 export const getServices = async (req, res) => {
+  console.log("HIT")
   const {
     search,
     category,
@@ -514,8 +515,7 @@ export const deleteService = async (req, res) => {
 export const getMyService = async (req, res) => {
   try {
     const svc = await Service.findOne({ admin: req.user.id })
-      .select('serviceName price category duration address businessHours admin')
-      .populate('admin', 'name')
+      .select('serviceName price category duration address businessHours')
       .lean()
 
     if (!svc) {

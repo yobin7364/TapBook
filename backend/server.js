@@ -35,6 +35,7 @@ app.use(bodyParser.json())
 app.use(passport.initialize())
 // Mount all your routers
 app.use('/api/services', servicesRoutes)
+
 app.use('/api/admin/time-slots', adminTimeSlotsRoutes)
 app.use('/api/admin/services', adminServicesRoutes)
 app.use('/api/users', users)
