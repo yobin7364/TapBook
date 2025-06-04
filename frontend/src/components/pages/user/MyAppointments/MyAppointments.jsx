@@ -20,6 +20,7 @@ import {
   getUpcomingAppointments,
   getPastAppointments,
   cancelAppointment,
+  submitReview,
 } from "../../../../action/customer/appointmentAction";
 import { resetAppointmentStatus } from "../../../../redux/appointmentSlice";
 
@@ -86,6 +87,13 @@ const MyAppointments = () => {
   const [reviewText, setReviewText] = useState("");
   const [appointmentToReview, setAppointmentToReview] = useState(null);
 
+  useEffect(() => {
+    if (!openReviewDialog) {
+      setRating(0);
+      setReviewText("");
+    }
+  }, [openReviewDialog]);
+
   const handleCancel = (appointment) => {
     setAppointmentToCancel(appointment);
     setOpenCancelDialog(true);
@@ -112,12 +120,14 @@ const MyAppointments = () => {
     setOpenReviewDialog(true);
   };
 
-  const submitReview = () => {
-    console.log("Review submitted:", {
-      service: appointmentToReview?.service,
+  const submitUserReview = () => {
+    const givenReview = {
+      appointment: appointmentToReview?.service?._id,
       rating,
-      reviewText,
-    });
+      comment: reviewText,
+    };
+
+    dispatch(submitReview(givenReview));
 
     setOpenReviewDialog(false);
     setAppointmentToReview(null);
@@ -126,6 +136,7 @@ const MyAppointments = () => {
     setToastMessage("Review submitted successfully!");
     setShowToast(true);
   };
+
   const capitalizeFirst = (str) => {
     if (!str) return "";
     return str.charAt(0).toUpperCase() + str.slice(1);
@@ -378,8 +389,14 @@ const MyAppointments = () => {
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenReviewDialog(false)}>Cancel</Button>
-            <Button onClick={submitReview} variant="contained">
+            <Button
+              onClick={() => {
+                setOpenReviewDialog(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={submitUserReview} variant="contained">
               Submit
             </Button>
           </DialogActions>

@@ -5,6 +5,7 @@ import {
   cancelAppointment,
   updateAppointment,
   getUserNotification,
+  submitReview,
 } from "../action/customer/appointmentAction";
 
 const initialState = {
@@ -26,6 +27,10 @@ const initialState = {
   notification: {},
   loadingNotification: false,
   errorNotification: false,
+
+  reviewLoading: false,
+  reviewSuccess: false,
+  reviewError: null,
 };
 
 const appointmentSlice = createSlice({
@@ -37,6 +42,8 @@ const appointmentSlice = createSlice({
       state.updateSuccess = false;
       state.errorCancel = null;
       state.errorUpdate = null;
+      state.reviewSuccess = false;
+      state.reviewError = null;
     },
   },
   extraReducers: (builder) => {
@@ -115,6 +122,22 @@ const appointmentSlice = createSlice({
       .addCase(getUserNotification.rejected, (state, action) => {
         state.loadingNotification = false;
         state.errorNotification = action.payload;
+      });
+
+    // Submit Review
+    builder
+      .addCase(submitReview.pending, (state) => {
+        state.reviewLoading = true;
+        state.reviewSuccess = false;
+        state.reviewError = null;
+      })
+      .addCase(submitReview.fulfilled, (state) => {
+        state.reviewLoading = false;
+        state.reviewSuccess = true;
+      })
+      .addCase(submitReview.rejected, (state, action) => {
+        state.reviewLoading = false;
+        state.reviewError = action.payload;
       });
   },
 });

@@ -78,13 +78,6 @@ const Notifications = () => {
                         hour12: true,
                       })}
                     </Typography>
-                    <Typography
-                      color={notif.read ? "text.secondary" : "primary"}
-                      fontWeight="bold"
-                      mt={1}
-                    >
-                      {notif.read ? "Read" : "Unread"}
-                    </Typography>
                   </Box>
                 </Grid>
               ))}
