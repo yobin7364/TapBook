@@ -5,7 +5,7 @@ import ServiceProviders from "./ServiceProviders";
 export const HomePage = () => {
   return (
     <div>
-      <FilterSection />
+      {/* <FilterSection /> */}
       <ServiceProviders />
     </div>
   );

@@ -84,3 +84,18 @@ export const getUserNotification = createAsyncThunk(
     }
   }
 );
+
+// POST: Submit a review
+export const submitReview = createAsyncThunk(
+  "reviews/submit",
+  async (givenReview, { rejectWithValue }) => {
+    try {
+      const { data } = await axios.post("/api/reviews", givenReview);
+      return data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || "Failed to submit review"
+      );
+    }
+  }
+);
