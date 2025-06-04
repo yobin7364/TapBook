@@ -6,6 +6,8 @@ export default defineConfig({
   base: "./", // Critical for Netlify
 
   server: {
+    port: 5100, // Replace with your desired port
+    strictPort: true, // Optional: throws error if port is already in use
     proxy: {
       "/api": {
         target: "http://localhost:4000", // Your backend URL

@@ -27,7 +27,7 @@ const app = express();
 // Enable CORS for Netlify frontend
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://tapbook2025.netlify.app"], // allow dev + production
+    origin: ["http://localhost:5100", "https://tapbook2025.netlify.app"], // allow dev + production
     credentials: true,
   })
 );
