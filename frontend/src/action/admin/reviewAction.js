@@ -1,6 +1,6 @@
 // src/redux/action/admin/reviewAction.js
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
+import axios from "../../utils/axiosInstance";
 
 // Get Reviews by Provider ID
 export const getProviderReviews = createAsyncThunk(

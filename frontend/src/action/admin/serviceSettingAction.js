@@ -1,6 +1,6 @@
 // src/redux/action/admin/serviceAction.js
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
+import axios from "../../utils/axiosInstance";
 
 // Add New Service
 export const addService = createAsyncThunk(

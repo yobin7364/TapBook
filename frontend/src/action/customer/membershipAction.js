@@ -1,6 +1,6 @@
 // src/redux/action/admin/membershipAction.js
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
+import axios from "../../utils/axiosInstance";
 
 // Subscribe to Membership
 export const subscribeMembership = createAsyncThunk(

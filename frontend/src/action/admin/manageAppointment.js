@@ -1,6 +1,6 @@
 // src/redux/action/admin/appointmentAction.js
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
+import axios from "../../utils/axiosInstance";
 
 // Get Appointments by Status
 export const getAppointmentsByStatus = createAsyncThunk(

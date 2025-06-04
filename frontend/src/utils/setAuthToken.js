@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from "./axiosInstance";
 
 //when called this func, attaches token to header
 const setAuthToken = (token) => {

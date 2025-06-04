@@ -18,10 +18,19 @@ import adminAppointmentRoutes from "./routes/adminAppointments.route.js";
 import membershipRoutes from "./routes/membership.route.js";
 import { autoCompleteAppointments } from "./utils/autoCompleteAppointments.js";
 import notificationsRoutes from "./routes/notifications.route.js";
+import cors from "cors";
 
 dotenv.config();
 
 const app = express();
+
+// Enable CORS for Netlify frontend
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://tapbook2025.netlify.app"], // allow dev + production
+    credentials: true,
+  })
+);
 
 // Initialize Passport strategy
 initializePassport();

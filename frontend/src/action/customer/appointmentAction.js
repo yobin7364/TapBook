@@ -1,5 +1,5 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
+import axios from "../../utils/axiosInstance";
 
 // get upcomming Appointments
 export const getUpcomingAppointments = createAsyncThunk(
