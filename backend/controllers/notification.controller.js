@@ -1,4 +1,5 @@
 // backend/controllers/notification.controller.js
+import { populate } from 'dotenv'
 import Notification from '../models/Notification.module.js'
 
 // @route   GET /api/notifications
@@ -24,7 +25,11 @@ export const getNotifications = async (req, res) => {
         select: 'status service',
         populate: {
           path: 'service',
-          select: 'serviceName',
+          select: 'serviceName category admin',
+          populate: {
+            path: 'admin',
+            select: 'name'
+          }
         },
       })
       .lean()
@@ -32,15 +37,18 @@ export const getNotifications = async (req, res) => {
     const notifications = notes.map((n) => {
         const appt = n.appointment || {}
         const svc = appt.service || {}
+        const adminUser = svc.admin || {}
 
         return {
-      id: n._id,
-      message: n.message,
-      appointment: n.appointment || null, // optional appointment _id
-      serviceName : svc.serviceName || null,
-      read: n.read,
-      date: n.createdAt,
-    }})
+          id: n._id,
+          message: n.message,
+          appointment: n.appointment || null, // optional appointment _id
+          serviceName: svc.serviceName || null,
+          category: svc.category || null,
+          adminName: adminUser.name || null,
+          read: n.read,
+          date: n.createdAt,
+        }})
 
     return res.json({
       success: true,
