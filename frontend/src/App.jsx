@@ -4,7 +4,7 @@ import store from "./store/store";
 import Login from "./components/auth/Login";
 import RegisterForm from "./components/auth/RegisterForm";
 import { HomePage } from "./components/pages/user/HomePage/HomePage";
-import UserNavbar from "./components/common/userNavBar";
+import UserNavbar from "./components/common/UserNavBar";
 import UserFooter from "./components/common/UserFooter";
 import BookingPage from "./components/pages/user/BookingAppointment/BookingPage";
 import MyAppointments from "./components/pages/user/MyAppointments/MyAppointments";

@@ -18,7 +18,6 @@ import AppRegistrationIcon from "@mui/icons-material/AppRegistration";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import CardMembershipIcon from "@mui/icons-material/CardMembership";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-import { Badge } from "@mui/material";
 
 const UserNavbar = () => {
   const [anchorEl, setAnchorEl] = React.useState(null);
