@@ -56,10 +56,10 @@ const ChangePasswordPage = () => {
       navigate("/profilePage");
     } catch (err) {
       if (typeof err === "object") {
-        if (err.currentPassword) {
+        if (err.oldPassword) {
           setError("currentPassword", {
             type: "server",
-            message: err.currentPassword,
+            message: err.oldPassword,
           });
         }
         if (err.newPassword) {
