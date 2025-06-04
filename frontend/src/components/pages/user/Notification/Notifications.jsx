@@ -66,9 +66,22 @@ const Notifications = () => {
             <Grid container spacing={2}>
               {notifications.map((notif) => (
                 <Grid item xs={12} key={notif.id}>
-                  <Box sx={{ p: 2, border: "1px solid #ccc", borderRadius: 2 }}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      border: "1px solid #ccc",
+                      borderRadius: 2,
+                      backgroundColor: notif.read ? "#fff" : "#f1faff",
+                    }}
+                  >
                     <Typography fontWeight="bold">{notif.message}</Typography>
+                    <Typography color="text.secondary" mt={1}>
+                      Service Provider: <strong>{notif.adminName}</strong>
+                    </Typography>
                     <Typography color="text.secondary">
+                      Category: <strong>{notif.category}</strong>
+                    </Typography>
+                    <Typography color="text.secondary" mt={1}>
                       {new Date(notif.date).toLocaleString("en-US", {
                         month: "long",
                         day: "numeric",
