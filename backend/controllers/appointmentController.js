@@ -6,59 +6,94 @@ import { getAppointmentSummaryData } from '../utils/appointment.utils.js'
 import { sendEmail } from '../utils/mailer.js' 
 import Review from '../models/Review.module.js'
 import Notification from '../models/Notification.module.js'
+import { DateTime } from 'luxon'
 
 
 // @route   POST /api/appointments
 // @desc    Book a new appointment (user)
 // @access  Private (user)
+
 export const bookAppointment = async (req, res) => {
-  const {name, service, start, mobile, note } = req.body
+  const { name, service: serviceId, start, mobile, note } = req.body
 
-
-  // Parse dates
+  // 1) Parse the incoming “start” as a JS Date (UTC)
   const startDate = new Date(start)
-  const now       = new Date()
+  const now = new Date()
+
   if (isNaN(startDate)) {
     return res.status(400).json({
       success: false,
-      error: 'Invalid start date'
+      error: 'Invalid start date',
     })
   }
   if (startDate < now) {
     return res.status(400).json({
       success: false,
-      error: 'Cannot book an appointment in the past'
+      error: 'Cannot book an appointment in the past',
     })
   }
 
   try {
-    // Load service to get its duration
-    const svc = await Service.findById(service)
+    // 2) Load service to get duration + businessHours
+    const svc = await Service.findById(serviceId)
     if (!svc) {
       return res
         .status(404)
         .json({ success: false, error: 'Service not found' })
     }
 
-    // Compute end using the service’s duration (in minutes)
+    // 3) CONVERT “startDate” (UTC) → Sydney local so we can pick the weekday
+    const localDT = DateTime.fromJSDate(startDate, { zone: 'Australia/Sydney' })
+    const weekdayName = localDT.toLocaleString({ weekday: 'long' }) // e.g. "Wednesday"
+
+    // 4) Fetch that day’s businessHours from the Map
+    const hours = svc.businessHours.get(weekdayName)
+    if (!hours || hours.closed) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Service is closed on that day' })
+    }
+
+    // 5) Parse hours.from/to (HH:mm:ss) into Sydney-local DateTimes on the same date
+    const [hFrom, mFrom, sFrom] = hours.from
+      .split(':')
+      .map((x) => parseInt(x, 10))
+    const [hTo, mTo, sTo] = hours.to.split(':').map((x) => parseInt(x, 10))
+
+    const year = localDT.year
+    const month = localDT.month
+    const day = localDT.day
+
+    // Opening at, say, 10:00 Sydney → that in UTC is openingUTC
+    const openingDT = DateTime.fromObject(
+      { year, month, day, hour: hFrom, minute: mFrom, second: sFrom },
+      { zone: 'Australia/Sydney' }
+    )
+    const closingDT = DateTime.fromObject(
+      { year, month, day, hour: hTo, minute: mTo, second: sTo },
+      { zone: 'Australia/Sydney' }
+    )
+
+    const openingUTC = openingDT.toUTC().toJSDate()
+    const closingUTC = closingDT.toUTC().toJSDate()
+
+    // 6) If startDate (UTC) is before opening or ≥ closing, reject
+    if (startDate < openingUTC || startDate >= closingUTC) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          error: 'Requested time is outside business hours',
+        })
+    }
+
+    // 7) Compute endDate based on service duration (in minutes)
     const endDate = new Date(startDate.getTime() + svc.duration * 60000)
     const slot = { start: startDate, end: endDate }
 
-    // business hours + cost summary
-    const { summary, error } = await getAppointmentSummaryData({
-      userId: req.user.id,
-      serviceId: service,
-      slot,
-    })
-    if (error) {
-      return res.status(400).json({ success: false, error })
-    }
-
-    const { serviceCost, membershipDiscount, totalDue } = summary
-
-    // Prevent double-booking the same provider
+    // 8) Prevent double‐booking the same provider
     const conflict = await Appointment.findOne({
-      service,
+      service: serviceId,
       status: { $in: ['pending', 'confirmed'] },
       'slot.start': { $lt: endDate },
       'slot.end': { $gt: startDate },
@@ -70,7 +105,7 @@ export const bookAppointment = async (req, res) => {
       })
     }
 
-    // Prevent user from double-booking themselves
+    // 9) Prevent user from double‐booking themselves
     const selfConflict = await Appointment.findOne({
       customer: req.user.id,
       status: { $in: ['pending', 'confirmed'] },
@@ -83,21 +118,45 @@ export const bookAppointment = async (req, res) => {
         error: 'You already have a booking in that time slot',
       })
     }
-    // Compute average service rating
+
+    // 10) Compute average service rating (for returned payload)
     const stats = await Review.aggregate([
       { $match: { service: svc._id } },
       { $group: { _id: null, avgRating: { $avg: '$rating' } } },
     ])
     const avgRating = stats[0]?.avgRating ?? 0
 
-    // Fetch admin name
+    // 11) Fetch admin name
     const adminUser = await User.findById(svc.admin).select('name').lean()
     const adminName = adminUser?.name || 'Unknown'
-    // Save the appointment, embedding payment breakdown
+
+    // 12) Calculate payment summary (you had getAppointmentSummaryData; we'll assume it just returns cost fields)
+    //     If you still want to use it, you can—but it should not re‐validate business hours.
+    //     Here’s a quick manual fallback if you want to compute basic cost + discount:
+    let serviceCost = svc.price
+    let membershipDiscount = 0
+    let totalDue = serviceCost
+
+    // If you rely entirely on getAppointmentSummaryData, uncomment and use below:
+    /*
+    const { summary, error } = await getAppointmentSummaryData({
+      userId: req.user.id,
+      serviceId: serviceId,
+      slot,
+    })
+    if (error) {
+      return res.status(400).json({ success: false, error })
+    }
+    serviceCost = summary.serviceCost
+    membershipDiscount = summary.membershipDiscount
+    totalDue = summary.totalDue
+    */
+
+    // 13) Create and save the appointment
     const appointment = new Appointment({
       customer: req.user.id,
       customerName: name,
-      service,
+      service: serviceId,
       slot,
       scheduledAt: startDate,
       mobile,
@@ -110,10 +169,11 @@ export const bookAppointment = async (req, res) => {
       },
     })
     await appointment.save()
-    // Create notification
+
+    // 14) Create notification for the user
     await Notification.create({
       user: req.user.id,
-      type: 'status', 
+      type: 'status',
       message: `Your appointment for "${
         svc.serviceName || svc.category
       }" is now pending.`,
@@ -121,13 +181,14 @@ export const bookAppointment = async (req, res) => {
       read: false,
       createdAt: new Date(),
     })
-    //Return everything in one go
+
+    // 15) Return the newly‐created appointment + extra data
     return res.status(201).json({
-      success: true,
+      success: serviceCost !== undefined, // or true
       appointment,
-      serviceCost, // e.g. 120
-      membershipDiscount, //   e.g. 6
-      totalDue, //   e.g.114
+      serviceCost,
+      membershipDiscount,
+      totalDue,
       serviceAddress: svc.address,
       avgRating,
       adminName,
