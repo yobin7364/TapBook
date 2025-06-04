@@ -360,14 +360,12 @@ export const getPastAppointments = async (req, res) => {
     const total = await Appointment.countDocuments({
       customer:   req.user.id,
       status:     'completed',           // only completed
-      'slot.end': { $lt: now },
     })
 
     // 2) fetch one page of those past‐completed appointments
     const past = await Appointment.find({
       customer: req.user.id,
       status: 'completed',
-      'slot.end': { $lt: now },
     })
       .sort({ 'slot.start': -1 }) // most recent first
       .skip(skip)

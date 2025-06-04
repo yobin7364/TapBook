@@ -29,6 +29,7 @@ if (appt.status !== 'completed') {
 }
 
 
+
     // Look up the service to find the admin who provided it
     const svc = await Service.findById(appt.service)
     if (!svc) {
@@ -38,7 +39,7 @@ if (appt.status !== 'completed') {
     }
 
     // Prevent duplicates
-    if (await Review.findOne({ appointment })) {
+    if (await Review.findOne({ appointment, reviewer: req.user.id })) {
       return res
         .status(400)
         .json({ success: false, error: 'Review already submitted' })
