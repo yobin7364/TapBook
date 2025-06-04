@@ -197,7 +197,7 @@ const MyAppointments = () => {
           ) : (
             upcoming?.map((appointment) => (
               <Box
-                key={appointment.id}
+                key={appointment._id}
                 sx={{
                   p: 3,
                   mb: 3,
@@ -245,7 +245,7 @@ const MyAppointments = () => {
           ) : (
             past?.map((appointment) => (
               <Box
-                key={appointment.id}
+                key={appointment._id}
                 sx={{
                   p: 3,
                   mb: 3,
@@ -268,7 +268,7 @@ const MyAppointments = () => {
                   {appointment.service?.category || "nan"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" mb={2}>
-                  with {appointment.service?.name}
+                  with {appointment.service?.admin?.name}
                 </Typography>
 
                 <Box sx={{ display: "flex", gap: 2 }}>

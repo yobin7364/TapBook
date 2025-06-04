@@ -108,45 +108,45 @@ const BookingPage = () => {
     }
   }, [isAuthenticated, currentMembership, serviceCost]);
 
-  const handlePayment = () => {
-    if (!selectedTime || !/^[0-9]{10}$/.test(mobile)) return;
+ const handlePayment = () => {
+   if (!selectedTime || !/^[0-9]{10}$/.test(mobile)) return
 
-    const [timeString, period] = selectedTime.split(" ");
-    let [hour, minute] = timeString.split(":").map(Number);
+   // 1) Parse “9:00 AM” / “12:30 PM” into (hour, minute) in 24h
+   const [timeString, period] = selectedTime.split(' ') // e.g. ["12:00","PM"]
+   let [hour, minute] = timeString.split(':').map(Number)
+   if (period === 'PM' && hour !== 12) hour += 12
+   if (period === 'AM' && hour === 12) hour = 0
 
-    if (period === "PM" && hour !== 12) hour += 12;
-    if (period === "AM" && hour === 12) hour = 0;
+   // 2) Build a Date in the LOCAL timezone (e.g. Sydney)
+   const bookingDateTime = new Date(selectedDate)
+   bookingDateTime.setHours(hour, minute, 0, 0)
+   // Now bookingDateTime is e.g. 2025-06-04T12:00:00+10:00 (internally)
 
-    const bookingDateTime = new Date(selectedDate);
-    bookingDateTime.setHours(hour, minute, 0, 0);
+   // 3) Convert that local Date → TRUE UTC ISO string
+   function toUTCISOString(dateObj) {
+     const year = dateObj.getUTCFullYear()
+     const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0')
+     const day = String(dateObj.getUTCDate()).padStart(2, '0')
+     const hours = String(dateObj.getUTCHours()).padStart(2, '0')
+     const mins = String(dateObj.getUTCMinutes()).padStart(2, '0')
+     const secs = String(dateObj.getUTCSeconds()).padStart(2, '0')
+     return `${year}-${month}-${day}T${hours}:${mins}:${secs}.000Z`
+   }
 
-    // Format local date manually
-    function formatLocalToISOString(date) {
-      const pad = (num) => String(num).padStart(2, "0");
-      const year = date.getFullYear();
-      const month = pad(date.getMonth() + 1);
-      const day = pad(date.getDate());
-      const hours = pad(date.getHours());
-      const minutes = pad(date.getMinutes());
-      const seconds = pad(date.getSeconds());
+   const finalDateString = toUTCISOString(bookingDateTime)
+   // e.g. if bookingDateTime was “2025-06-04T12:00:00+10:00”,
+   // finalDateString becomes “2025-06-04T02:00:00.000Z”
 
-      return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`;
-    }
+   const appointmentData = {
+     service: serviceId,
+     start: finalDateString,
+     name: name,
+     mobile: mobile,
+     note: note || '',
+   }
 
-    const finalDateString = formatLocalToISOString(bookingDateTime);
-
-    const appointmentData = {
-      service: serviceId, // replace with actual service ID
-      start: finalDateString,
-      name: name,
-      mobile: mobile,
-      note: note || "", // optional
-    };
-
-    //console.log("appointmentData", appointmentData);
-
-    dispatch(bookAppointment(appointmentData));
-  };
+   dispatch(bookAppointment(appointmentData))
+ }
 
   useEffect(() => {
     if (appointment?.success) {
