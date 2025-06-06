@@ -3,7 +3,6 @@ import Service from '../models/Service.module.js'
 import { validateAppointment } from '../validator/appointment.validator.js'
 import User from '../models/User.module.js'
 import { getAppointmentSummaryData } from '../utils/appointment.utils.js'
-import { sendEmail } from '../utils/mailer.js' 
 import Review from '../models/Review.module.js'
 import Notification from '../models/Notification.module.js'
 import { DateTime } from 'luxon'
@@ -174,9 +173,9 @@ export const bookAppointment = async (req, res) => {
     await Notification.create({
       user: req.user.id,
       type: 'status',
-      message: `Your appointment for "${
+      message: `Thank you! Your request to book a "${
         svc.serviceName || svc.category
-      }" is now pending.`,
+      }" appointment is now pending approval.`,
       appointment: appointment._id,
       read: false,
       createdAt: new Date(),

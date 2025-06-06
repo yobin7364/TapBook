@@ -1,0 +1,46 @@
+// seedData/seedAll.js
+import mongoose from 'mongoose'
+import dotenv from 'dotenv'
+dotenv.config()
+
+import { seedUsers } from './userSeed.js'
+import { seedData } from './seedData.js'
+import { seedReviews } from './seedReview.js'
+async function connectDB() {
+  try {
+    const uri = process.env.MONGO_URI_SEED || process.env.MONGO_URI
+    await mongoose.connect(uri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    })
+    console.log('🟢 Connected to MongoDB for seeding →', uri)
+  } catch (err) {
+    console.error('❌ MongoDB connection error:', err)
+    process.exit(1)
+  }
+}
+
+async function seedAll() {
+  await connectDB()
+
+  try {
+    // 1) Seed users (delete all, create 10 admins + 20 customers)
+    const { adminIds, customerIds } = await seedUsers()
+
+    // 2) Seed services + appointments (delete all, then create using those IDs)
+    await seedData({ adminIds, customerIds })
+
+    await seedReviews()
+
+    console.log('🎉 Seeding completed successfully.')
+  } catch (err) {
+    console.error('❌ Seeding error:', err)
+  } finally {
+    // 3) Always disconnect at the end
+    await mongoose.disconnect()
+    console.log('🔴 Disconnected from MongoDB.')
+    process.exit(0)
+  }
+}
+
+seedAll()
